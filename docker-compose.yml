@@ -16,7 +16,7 @@ services:
     - PORT=3000
     - NEXT_SHARP_PATH=/app/node_modules/sharp
     - API_URI=http://baegundae-rocket:3000
-    - KAKAO_KEY=fe100722a808f82c00d5e1840c24dd7f
+    - KAKAO_KEY=6a36a8ed0516f2581406192cbbf6a98a
     - TZ=Asia/Seoul
     networks:
     - traefik
