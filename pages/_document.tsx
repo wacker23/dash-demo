@@ -12,7 +12,7 @@ function MyDocument() {
       <body>
       <Main />
       <NextScript />
-      <script type={'text/javascript'} src={'//dapi.kakao.com/v2/maps/sdk.js?appkey=7428f6267223fd45ce4f2ee6f98528e9&libraries=services,clusterer&autoload=false'} defer></script>
+      <script type={'text/javascript'} src={'//dapi.kakao.com/v2/maps/sdk.js?appkey=6a36a8ed0516f2581406192cbbf6a98a&libraries=services,clusterer&autoload=false'} defer></script>
       </body>
     </Html>
   );
