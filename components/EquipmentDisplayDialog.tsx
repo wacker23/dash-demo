@@ -72,8 +72,8 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   const app = useApp();
   const {mutate, cache} = useSWRConfig();
   const snackbar = useSnackbar();
-  const {device, isLoading: isDeviceLoading, error: deviceError} = useEquipmentInfo(props.id);
-  const {clear, displayInfo, load, isLoading: isDisplayLoading, error: displayError} = useEquipmentDisplayInfo(props.id);
+  const {device, isLoading} = useEquipmentInfo(props.id);
+  const {clear, displayInfo, load, isLoading: isDisplayLoading} = useEquipmentDisplayInfo(props.id);
   const [isLoaded, setIsLoaded] = useState(false);
   const [tabState, setTabState] = useState(1);
   const [startDate, setStartDate] = useState<Dayjs | null>(null);
@@ -85,7 +85,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   const handleClose = async () => {
     clear();
     setIsLoaded(false);
-    props.onClose?.();
+    props.onClose && props.onClose();
   };
 
   const handlePaginationChange = async ({page}: GridPaginationModel) => {
@@ -93,22 +93,16 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   };
 
   const loadDisplayInfo = useCallback(async (start?: string, end?: string) => {
-    try {
-      if (start && end) {
-        await load(start, end);
-      } else if (props.id.trim() !== '') {
-        await load();
-      }
-    } catch (error) {
-      console.error('Failed to load display info:', error);
-      snackbar.toast('error', '디스플레이 정보를 불러오는 데 실패했습니다.');
+    if (start && end) {
+      // If you need date range functionality for display info
+      await load();
+    } else if (props.id.trim() !== '') {
+      await load();
     }
-  }, [props.id, load, snackbar]);
+  }, [props.id, load]);
 
   const handleSearchRange = async () => {
-    if (!startDate || !endDate) return;
-    
-    try {
+    if (startDate && endDate) {
       if (device?.statusRange) {
         if (device.statusRange.start) {
           const pv = dayjs(device.statusRange.start).format('YYYY-MM-DD');
@@ -128,9 +122,6 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
       const start = startDate.format('YYYY-MM-DD');
       const end = endDate.format('YYYY-MM-DD');
       await loadDisplayInfo(start, end);
-    } catch (error) {
-      console.error('Failed to search range:', error);
-      snackbar.toast('error', '날짜 범위 검색에 실패했습니다.');
     }
   };
 
@@ -150,42 +141,16 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   }, [app]);
 
   useEffect(() => {
-    if (visible) {
-      loadDisplayInfo().catch(console.error);
-    }
-  }, [visible, loadDisplayInfo]);
+    (async () => {
+      await loadDisplayInfo();
+    })();
+  }, [loadDisplayInfo]);
 
   useEffect(() => {
     if (visible && displayInfo) {
       setIsLoaded(true);
     }
   }, [visible, displayInfo]);
-
-  // Handle API errors
-  useEffect(() => {
-    if (deviceError) {
-      snackbar.toast('error', '장비 정보를 불러오는 데 실패했습니다.');
-    }
-    if (displayError) {
-      snackbar.toast('error', '디스플레이 정보를 불러오는 데 실패했습니다.');
-    }
-  }, [deviceError, displayError, snackbar]);
-
-  // Prepare data for DataGrid with fallback for missing .no field
-  const gridData = useMemo(() => {
-    if (!displayInfo) return [];
-    
-    // If displayInfo is an error object (e.g., { description: 'not found' })
-    if (typeof displayInfo === 'object' && 'description' in displayInfo) {
-      return [];
-    }
-    
-    // Ensure each row has a unique id
-    return [{
-      ...displayInfo,
-      id: displayInfo.no ?? `${props.id}-${displayInfo.receive_date}` // Fallback ID
-    }];
-  }, [displayInfo, props.id]);
 
   return (
     <Dialog
@@ -309,18 +274,17 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
           <Typography component="h2" variant="h6" color="primary" gutterBottom>
             디스플레이 정보
           </Typography>
-          {isDisplayLoading ? (
-            <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
-          ) : gridData.length > 0 ? (
+          {displayInfo ? (
             <DataGrid
               columns={displayInfoCols}
-              rows={gridData}
+              rows={[displayInfo]}
+              getRowId={row => row.no}
               pageSizeOptions={[100]}
               localeText={{
                 noRowsLabel: '디스플레이 정보가 없습니다.',
               }} />
           ) : (
-            <Typography>디스플레이 정보가 없습니다.</Typography>
+            <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
           )}
         </Box>
         <Container
@@ -353,11 +317,9 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                   디스플레이 정보 그래프
                 </Typography>
                 <>
-                  {isDisplayLoading ? (
-                    <Typography>데이터를 불러오는 중입니다...</Typography>
-                  ) : gridData.length > 0 ? (
+                  {!isDisplayLoading && displayInfo && (
                     <Chart
-                      data={gridData}
+                      data={[displayInfo]}
                       tooltipContent={({active, payload, label}) => {
                         const receive_date = dayjs(label).format('YYYY년 MM월 DD일 HH시 mm분 ss초');
                         return (
@@ -416,10 +378,10 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                           domain: [
                             0,
                             Math.max(
-                              gridData[0]?.currR ?? 0, 
-                              gridData[0]?.currG ?? 0,
-                              gridData[0]?.offCurrR ?? 0,
-                              gridData[0]?.offCurrG ?? 0
+                              displayInfo.currR ?? 0, 
+                              displayInfo.currG ?? 0,
+                              displayInfo.offCurrR ?? 0,
+                              displayInfo.offCurrG ?? 0
                             ) * 1.2,
                           ]
                         },
@@ -439,8 +401,6 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                         {key: 'offCurrR', name: '오프 전류 R', color: '#e9967a', type: 'monotone', yAxisId: 'currAxis'},
                         {key: 'offCurrG', name: '오프 전류 G', color: '#20b2aa', type: 'monotone', yAxisId: 'currAxis'},
                       ]} />
-                  ) : (
-                    <Typography>표시할 데이터가 없습니다.</Typography>
                   )}
                 </>
               </TabPanel>
@@ -448,18 +408,17 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                 <Typography component="h2" variant="h6" color="primary" gutterBottom>
                   디스플레이 상세 정보
                 </Typography>
-                {isDisplayLoading ? (
-                  <Typography>데이터를 불러오는 중입니다...</Typography>
-                ) : gridData.length > 0 ? (
+                {displayInfo ? (
                   <DataGrid
                     columns={displayInfoCols}
-                    rows={gridData}
+                    rows={[displayInfo]}
+                    getRowId={row => row.no}
                     pageSizeOptions={[100]}
                     localeText={{
                       noRowsLabel: '디스플레이 정보가 없습니다.',
                     }} />
                 ) : (
-                  <Typography>디스플레이 정보가 없습니다.</Typography>
+                  <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
                 )}
               </TabPanel>
             </Grid>
