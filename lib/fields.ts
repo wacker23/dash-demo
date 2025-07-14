@@ -33,7 +33,13 @@ export const EquipmentStatusFields: EquipmentStatusFieldsType = {
     'ampG',
     'tempStat',
   ] as const,
-  VGL: [] as const,
+  VGL: [
+    'voltR',
+    'voltG',
+    'ampR',
+    'ampG',
+    'tempStat',
+  ] as const,
   BGL: [] as const,
   LGL: [] as const,
 };

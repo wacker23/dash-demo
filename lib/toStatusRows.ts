@@ -9,29 +9,24 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
     return [];
   }
 
-  return rows.map(({id, rawData, state, abnormal, receive_date, ...props}) => {
+  return rows.map(({ id, rawData, state, abnormal, receive_date, ...props }) => {
     const fields = EquipmentStatusFields[type];
     const values = rawData.split('\n');
+
     return values.reduce<StatusRowsDto>((object, value, idx) => {
       const key = fields[idx];
       let newValue: string | number = value;
+
       switch (key) {
         case 'voltR':
         case 'voltG':
-          //should be remove when the dolphin code upload
           newValue = Number(value) / 10;
-          if (isNaN(newValue)) {
-            throw new Error(`Cannot convert value(${value}) to number for field(${key})`);
-          }
           break;
 
-        case 'ampR':
-        case 'ampG':
-        case 'ampOff':
-        case 'dutyR':
-        case 'dutyG':
-        case 'outStat':
         case 'tempStat':
+          newValue = (Number(value) - 400) / 10;
+          break;
+
         case 'powerLimit':
         case 'dirStat':
         case 'modeStat':
@@ -39,19 +34,22 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
         case 'pubNo':
         case 'firmwareResetCount':
         case 'dispErrId':
+        case 'dutyR':
+        case 'dutyG':
+        case 'outStat':
           newValue = Number(value);
-          if (isNaN(newValue)) {
-            throw new Error(`Cannot convert value(${value}) to number for field(${key})`);
-          }
           break;
 
-
-          case 'ampR':
-          case 'ampG':
-          case 'ampOff':
-            newValue = value; // already like "설치값,현재값"
-            break;
-            
+        case 'ampR':
+        case 'ampG':
+        case 'ampOff':
+          // Keep as string if format is "설치값,현재값"
+          if (value.includes(',')) {
+            newValue = value;
+          } else {
+            newValue = Number(value);
+          }
+          break;
 
         case 'dispAbnormalStat':
           newValue = value.split(',').reduce((result, value, idx, array) => {
@@ -63,19 +61,35 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
             return result;
           }, '');
           break;
+
         case 'version':
-          newValue = `${Number(value) / 10}`
+          newValue = `${Number(value) / 10}`;
           break;
+
         case 'timestamp':
           const hour = value.slice(4, 6);
           const minute = value.slice(6, 8);
           newValue = `${hour}시 ${minute}분`;
           break;
+
+        default:
+          break;
       }
+
+      // validate numeric conversions
+      if (
+        ['voltR', 'voltG', 'tempStat', 'powerLimit', 'dirStat', 'modeStat', 'commStat', 'pubNo', 'firmwareResetCount', 'dispErrId', 'dutyR', 'dutyG', 'outStat'].includes(key) ||
+        (['ampR', 'ampG', 'ampOff'].includes(key) && !value.includes(','))
+      ) {
+        if (isNaN(Number(newValue))) {
+          throw new Error(`Cannot convert value(${value}) to number for field(${key})`);
+        }
+      }
+
       return Object.assign(object, {
         [key]: newValue,
       });
-    }, {id, state, abnormal, receive_date: new Date(receive_date)});
+    }, { id, state, abnormal, receive_date: new Date(receive_date) });
   });
 };
 

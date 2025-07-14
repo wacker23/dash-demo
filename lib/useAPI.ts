@@ -10,6 +10,7 @@ import { EquipmentTypeKey } from '../types/constants';
 import { number } from 'prop-types';
 import { SearchDeviceDto } from '../types/search-device.dto';
 import { useSession } from './useSession';
+import { DispalyDeviceInfoDto } from '../types/display-device-info.dto';
 
 interface PlaceData {
   id: number;
@@ -93,6 +94,28 @@ export const useEquipmentInfo = (id: string) => {
     isLoading: !error && !data,
     hasFound,
   };
+};
+
+export const useEquipmentDisplayInfo = (id: string) => {
+  const [key, setKey] = useState(
+    id.trim() !== '' ? `/api/device/display_info/${id}` : null,
+  );
+  const {data, error} = useSWR<DispalyDeviceInfoDto>(key, {refreshInterval: 5000});
+
+  const clear = useCallback(() => {
+    setKey(null);
+  }, []);
+
+  const load = useCallback(() => {
+    setKey(id.trim() !== '' ? `/api/device/display_info/${id}` : null);
+  }, [id]);
+
+  return {
+    clear,
+    displayInfo: data,
+    isLoading: !error && !data,
+    load,
+  }
 };
 
 export const useEquipmentDailyLog = (id: string) => {

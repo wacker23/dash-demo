@@ -82,7 +82,7 @@ const fieldConfig: { [p: string]: { name: string, formatter?: (params: GridValue
       }
     }
   },
-  tempStat: {
+/*  tempStat: {
   name: '온도 상태',
   formatter: (params): string => {
     const raw = Number(params.value);
@@ -90,13 +90,13 @@ const fieldConfig: { [p: string]: { name: string, formatter?: (params: GridValue
     const temperature = ((raw - 400) / 10).toFixed(1); // keep 1 decimal place if needed
     return `${temperature}°C`;
   },
-},
+}, */
 
-/*tempStat: {
+tempStat: {
     name: '온도 상태',
     formatter: (params): string =>
       `${params.value}°C`,
-  }, */
+  },
 
   powerLimit: {
     name: '전원 리미터',
