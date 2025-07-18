@@ -10,9 +10,12 @@ import {
   Tab,
   Tabs,
   Toolbar,
-  Typography
+  Typography,
+  Tooltip,
+  Badge
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import WarningIcon from '@mui/icons-material/Warning';
 import Slide from '@mui/material/Slide';
 import {DataGrid, GridPaginationModel} from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
@@ -73,7 +76,15 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   const {mutate, cache} = useSWRConfig();
   const snackbar = useSnackbar();
   const {device, isLoading} = useEquipmentInfo(props.id);
-  const {clear, displayInfo, load, isLoading: isDisplayLoading} = useEquipmentDisplayInfo(props.id);
+  const {
+    clear, 
+    displayInfo, 
+    load, 
+    isLoading: isDisplayLoading, 
+    error: displayError,
+    deviceStatuses,
+    overallWarning
+  } = useEquipmentDisplayInfo(props.id);
   const [isLoaded, setIsLoaded] = useState(false);
   const [tabState, setTabState] = useState(1);
   const [startDate, setStartDate] = useState<Dayjs | null>(null);
@@ -85,24 +96,34 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   const handleClose = async () => {
     clear();
     setIsLoaded(false);
-    props.onClose && props.onClose();
+    props.onClose?.();
   };
 
   const handlePaginationChange = async ({page}: GridPaginationModel) => {
     // Pagination logic if needed
   };
 
-  const loadDisplayInfo = useCallback(async (start?: string, end?: string) => {
-    if (start && end) {
-      // If you need date range functionality for display info
-      await load();
-    } else if (props.id.trim() !== '') {
-      await load();
+  const loadDisplayInfo = useCallback(async () => {
+    try {
+      if (props.id.trim() !== '') {
+        await load();
+      }
+    } catch (error) {
+      console.error('Failed to load display info:', error);
+      snackbar.toast('error', '디스플레이 정보를 불러오는 데 실패했습니다.');
     }
-  }, [props.id, load]);
+  }, [props.id, load, snackbar]);
+
+  useEffect(() => {
+    if (visible) {
+      loadDisplayInfo().catch(console.error);
+    }
+  }, [visible, loadDisplayInfo]);
 
   const handleSearchRange = async () => {
-    if (startDate && endDate) {
+    if (!startDate || !endDate) return;
+    
+    try {
       if (device?.statusRange) {
         if (device.statusRange.start) {
           const pv = dayjs(device.statusRange.start).format('YYYY-MM-DD');
@@ -121,7 +142,10 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
       }
       const start = startDate.format('YYYY-MM-DD');
       const end = endDate.format('YYYY-MM-DD');
-      await loadDisplayInfo(start, end);
+      
+    } catch (error) {
+      console.error('Failed to search range:', error);
+      snackbar.toast('error', '날짜 범위 검색에 실패했습니다.');
     }
   };
 
@@ -141,16 +165,52 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   }, [app]);
 
   useEffect(() => {
-    (async () => {
-      await loadDisplayInfo();
-    })();
-  }, [loadDisplayInfo]);
+    if (visible) {
+      loadDisplayInfo().catch(console.error);
+    }
+  }, [visible, loadDisplayInfo]);
 
   useEffect(() => {
     if (visible && displayInfo) {
       setIsLoaded(true);
     }
   }, [visible, displayInfo]);
+
+  const deviceCount = useMemo(() => {
+    if (!displayInfo || !Array.isArray(displayInfo)) return 0;
+    const uniqueDeviceIds = new Set(displayInfo.map(item => item.deviceid));
+    return uniqueDeviceIds.size;
+  }, [displayInfo]);
+
+  const gridData = useMemo(() => {
+    if (!displayInfo || !Array.isArray(displayInfo)) return [];
+    
+    return [...displayInfo]
+      .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
+      .map((item, index) => ({
+        ...item,
+        id: item.id || `${props.id}-${index}`,
+        receive_date: item.updated_at,
+        temp: item.temperature,
+        currR: item.current_red,
+        currG: item.current_green,
+        offCurrR: item.off_current_red,
+        offCurrG: item.off_current_green,
+        voltR: item.voltage_red,
+        voltG: item.voltage_green,
+      }));
+  }, [displayInfo, props.id]);
+
+  // Get device status for each device
+  const getDeviceStatus = (deviceId: number) => {
+    return deviceStatuses.find(status => status.deviceid === deviceId);
+  };
+
+  // Get unique device IDs for the grid
+  const activeDeviceIds = useMemo(() => {
+    if (!displayInfo || !Array.isArray(displayInfo)) return new Set<number>();
+    return new Set(displayInfo.map(item => Number(item.deviceid)));
+  }, [displayInfo]);
 
   return (
     <Dialog
@@ -167,21 +227,43 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
             <CloseIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
-            {`장비(${props.id}) 디스플레이 정보`}
+            {`장비(${props.id}) 장치 상태 정보`}
           </Typography>
           <Box sx={{ ml: 2, flexGrow: 1, flexDirection: 'row' }}>
             {device && (
               <Typography variant={'subtitle1'} sx={{ fontSize: { xs: '.75rem', sm: '1rem' } }}>
-                {`${device.location.name}`}
-                {device.units > 0 && ` (${device.units}개)`}
+                {device.location.name}
+                {deviceCount > 0 && ` (${deviceCount}개 장치)`}
               </Typography>
             )}
             {address && (
               <Typography sx={{ fontSize: { xs: '.50rem', sm: '.75rem' } }}>
-                {`${address.address_name}`}
+                {address.address_name}
               </Typography>
             )}
           </Box>
+          {/* Overall Warning Indicator */}
+          {overallWarning && (
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: (() => {
+              if (overallWarning.includes('critical')) return 'error.main'; // Critical - Red
+              if (overallWarning.includes('high')) return 'error.light'; // High - Light Red
+              if (overallWarning.includes('medium')) return 'warning.main'; // Medium - Orange
+              if (overallWarning.includes('low')) return 'warning.light'; // Low - Yellow
+              return 'success.main'; // Default/None - Green
+              })(),
+              px: 1,
+              borderRadius: 1,
+              ml: 2
+            }}>
+              <WarningIcon sx={{ mr: 0.5, fontSize: '1rem' }} />
+              <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                {overallWarning}
+              </Typography>
+            </Box>
+          )}
           <Box
             sx={{
               display: 'none',
@@ -274,17 +356,18 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
           <Typography component="h2" variant="h6" color="primary" gutterBottom>
             디스플레이 정보
           </Typography>
-          {displayInfo ? (
+          {isDisplayLoading ? (
+            <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
+          ) : gridData.length > 0 ? (
             <DataGrid
               columns={displayInfoCols}
-              rows={[displayInfo]}
-              getRowId={row => row.no}
+              rows={gridData}
               pageSizeOptions={[100]}
               localeText={{
                 noRowsLabel: '디스플레이 정보가 없습니다.',
               }} />
           ) : (
-            <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
+            <Typography>디스플레이 정보가 없습니다.</Typography>
           )}
         </Box>
         <Container
@@ -303,13 +386,13 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                 onChange={(_e, value) => setTabState(value)}>
                 <Tab
                   label={'그래프'}
-                  id={`tab-panel-1`}
-                  aria-controls={`tab-panel-1`}
+                  id={'tab-panel-1'}
+                  aria-controls={'tab-panel-1'}
                   value={1} />
                 <Tab
                   label={'상세 정보'}
-                  id={`tab-panel-2`}
-                  aria-controls={`tab-panel-2`}
+                  id={'tab-panel-2'}
+                  aria-controls={'tab-panel-2'}
                   value={2} />
               </Tabs>
               <TabPanel value={tabState} index={1}>
@@ -317,9 +400,11 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                   디스플레이 정보 그래프
                 </Typography>
                 <>
-                  {!isDisplayLoading && displayInfo && (
+                  {isDisplayLoading ? (
+                    <Typography>데이터를 불러오는 중입니다...</Typography>
+                  ) : gridData.length > 0 ? (
                     <Chart
-                      data={[displayInfo]}
+                      data={gridData}
                       tooltipContent={({active, payload, label}) => {
                         const receive_date = dayjs(label).format('YYYY년 MM월 DD일 HH시 mm분 ss초');
                         return (
@@ -341,7 +426,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                                       )}
                                       {String(item.dataKey).startsWith('curr') && (
                                         <Typography color={item.color} fontWeight={'bold'}>
-                                          {`${item.name}: ${item.value}A`}
+                                          {`${item.name}: ${item.value}mA`}
                                         </Typography>
                                       )}
                                       {String(item.dataKey).startsWith('offCurr') && (
@@ -352,7 +437,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                                     </Fragment>
                                   ))}
                                   <Typography color={'white'}>
-                                    {`${receive_date}`}
+                                    {receive_date}
                                   </Typography>
                                 </>
                               </Paper>
@@ -378,10 +463,10 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                           domain: [
                             0,
                             Math.max(
-                              displayInfo.currR ?? 0, 
-                              displayInfo.currG ?? 0,
-                              displayInfo.offCurrR ?? 0,
-                              displayInfo.offCurrG ?? 0
+                              gridData[0]?.current_red ?? 0, 
+                              gridData[0]?.current_green ?? 0,
+                              gridData[0]?.off_current_red ?? 0,
+                              gridData[0]?.off_current_green ?? 0
                             ) * 1.2,
                           ]
                         },
@@ -401,6 +486,8 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                         {key: 'offCurrR', name: '오프 전류 R', color: '#e9967a', type: 'monotone', yAxisId: 'currAxis'},
                         {key: 'offCurrG', name: '오프 전류 G', color: '#20b2aa', type: 'monotone', yAxisId: 'currAxis'},
                       ]} />
+                  ) : (
+                    <Typography>표시할 데이터가 없습니다.</Typography>
                   )}
                 </>
               </TabPanel>
@@ -408,20 +495,156 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                 <Typography component="h2" variant="h6" color="primary" gutterBottom>
                   디스플레이 상세 정보
                 </Typography>
-                {displayInfo ? (
+                {isDisplayLoading ? (
+                  <Typography>데이터를 불러오는 중입니다...</Typography>
+                ) : gridData.length > 0 ? (
                   <DataGrid
                     columns={displayInfoCols}
-                    rows={[displayInfo]}
-                    getRowId={row => row.no}
+                    rows={gridData}
                     pageSizeOptions={[100]}
                     localeText={{
                       noRowsLabel: '디스플레이 정보가 없습니다.',
                     }} />
                 ) : (
-                  <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
+                  <Typography>디스플레이 정보가 없습니다.</Typography>
                 )}
               </TabPanel>
             </Grid>
+          </Grid>
+        </Container>
+
+        {/* Device Grid Panel with Warning Indicators */}
+        <Container
+          maxWidth={false}
+          sx={{
+            mt: 2,
+            p: 2,
+            backgroundColor: '#1c1c1c',
+            borderRadius: 1,
+            borderTop: '1px solid rgb(5, 4, 4)'
+          }}>
+          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+            장치 상태 그리드
+          </Typography>
+          <Grid container spacing={1} sx={{ justifyContent: 'center' }}>
+            {Array.from({ length: 64 }).map((_, index) => {
+              const deviceId = index;
+              const isActive = activeDeviceIds.has(deviceId);
+              const deviceStatus = getDeviceStatus(deviceId);
+              const hasWarning = deviceStatus && deviceStatus.warningLevel !== 'none';
+
+              return (
+                <Grid item key={index} xs={3} sm={2} md={1.5} lg={1}>
+                  <Tooltip 
+                    title={
+                      deviceStatus ? (
+                        <Paper sx={{ px: 1, py: 0.5, backgroundColor: '#202123' }}>
+                          <Typography variant="body2">
+                            Device: {deviceStatus.deviceid}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Avg Red: {deviceStatus.avgCurrentRed.toFixed(2)}mA
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Avg Green: {deviceStatus.avgCurrentGreen.toFixed(2)}mA
+                          </Typography>
+                          <Typography variant="body2" color={hasWarning ? 'error' : 'success'}>
+                            {deviceStatus.warningMessage}
+                          </Typography>
+                        </Paper>
+                      ) : (
+                        <Typography variant="body2">No data available</Typography>
+                      )
+                    }
+                    placement="top"
+                    arrow
+                  >
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        width: '90%',
+                        aspectRatio: '1/1',
+                        bgcolor: isActive ? 'transparent' : 'grey.300',
+                        border: '1px solid',
+                        borderColor: 'grey.400',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        '&:hover': {
+                          boxShadow: 2,
+                          transform: 'scale(1.05)',
+                          transition: 'all 0.2s'
+                        }
+                      }}>
+                      {isActive ? (
+                        <>
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '50%',
+                              bgcolor: 'success.main',
+                              opacity: 0.8
+                            }} />
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '50%',
+                              bgcolor: 'error.main',
+                              opacity: 0.8
+                            }} />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              position: 'relative',
+                              zIndex: 1,
+                              fontWeight: 'bold',
+                              color: 'common.white',
+                              textShadow: '0 0 2px rgba(0,0,0,0.8)',
+                              fontSize: '0.75rem',
+                              '@media (min-width:600px)': {
+                                fontSize: '0.875rem'
+                              }
+                            }}>
+                            {index}
+                          </Typography>
+                          {hasWarning && (
+                            <WarningIcon
+                              sx={{
+                                position: 'absolute',
+                                top: 2,
+                                right: 2,
+                                color: 'warning.main',
+                                fontSize: '1rem',
+                                filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))'
+                              }}
+                            />
+                          )}
+                        </>
+                      ) : (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: 'grey.600',
+                            fontSize: '0.75rem',
+                            '@media (min-width:600px)': {
+                              fontSize: '0.875rem'
+                            }
+                          }}>
+                          {index}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Tooltip>
+                </Grid>
+              );
+            })}
           </Grid>
         </Container>
       </DialogContent>

@@ -1,12 +1,14 @@
-export interface DispalyDeviceInfoDto {
-  no: number;
-  idDevice: number;
-  voltR?: number; // Maps to voltage_red
-  voltG?: number; // Maps to voltage_green
-  currR?: number; // Maps to current_red
-  currG?: number; // Maps to current_green
-  offCurrR?: number; // Maps to off_current_red
-  offCurrG?: number; // Maps to off_current_green
-  temp?: number; // Maps to temperature
-  receive_date: Date; // Maps to updated_at
-}
+export type DispalyDeviceInfoDto = {
+  id: string; // Firestore document ID
+  deviceid: number; // This is the internal device ID from Firestore
+  equipment_id: number;
+  equipment_type: string;
+  current_red: number;
+  current_green: number;
+  off_current_red: number;
+  off_current_green: number;
+  voltage_red: number;
+  voltage_green: number;
+  temperature: number;
+  updated_at: Date;
+};

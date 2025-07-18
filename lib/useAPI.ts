@@ -12,6 +12,18 @@ import { SearchDeviceDto } from '../types/search-device.dto';
 import { useSession } from './useSession';
 import { DispalyDeviceInfoDto } from '../types/display-device-info.dto';
 
+
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  DocumentData
+} from 'firebase/firestore';
+import { db } from './firebase';
+
+
 interface PlaceData {
   id: number;
   name: string;
@@ -96,27 +108,101 @@ export const useEquipmentInfo = (id: string) => {
   };
 };
 
+
+
+const parseId = (id: string): [string, number] => {
+  const regex = /^([A-Z]+)(\d+)$/i;
+  const match = regex.exec(id.trim());
+  if (!match) return ['', -1];
+  return [match[1], parseInt(match[2], 10)];
+};
+
 export const useEquipmentDisplayInfo = (id: string) => {
-  const [key, setKey] = useState(
-    id.trim() !== '' ? `/api/device/display_info/${id}` : null,
-  );
-  const {data, error} = useSWR<DispalyDeviceInfoDto>(key, {refreshInterval: 5000});
+  const [displayInfo, setDisplayInfo] = useState<DispalyDeviceInfoDto[]>([]);
+  const [deviceStatuses, setDeviceStatuses] = useState<DeviceStatus[]>([]);
+  const [overallWarning, setOverallWarning] = useState<DeviceStatus['warningLevel']>('none');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  const clear = useCallback(() => {
-    setKey(null);
-  }, []);
+  const [type, numericId] = parseId(id);
 
-  const load = useCallback(() => {
-    setKey(id.trim() !== '' ? `/api/device/display_info/${id}` : null);
-  }, [id]);
+  const load = useCallback(async () => {
+    if (!type || numericId <= 0) {
+      console.warn(`[DisplayInfo] Invalid ID parsed: type=${type}, numericId=${numericId}`);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const colRef = collection(db, 'mqtt_db');
+      const q = query(
+        colRef,
+        where('equipment_type', '==', type),
+        where('equipment_id', '==', numericId),
+        orderBy('updated_at', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      const result: DispalyDeviceInfoDto[] = snapshot.docs.map(doc => {
+        const data = doc.data() as DocumentData;
+        return {
+          id: doc.id,
+          deviceid: data.deviceid ?? 'unknown',
+          temperature: data.temperature,
+          current_red: data.current_red,
+          current_green: data.current_green,
+          off_current_red: data.off_current_red,
+          off_current_green: data.off_current_green,
+          voltage_red: data.voltage_red,
+          voltage_green: data.voltage_green,
+          equipment_id: data.equipment_id,
+          equipment_type: data.equipment_type,
+          updated_at: data.updated_at?.toDate?.() ?? new Date(),
+        };
+      });
+
+      const statuses = calculateDeviceStatuses(result);
+      setDeviceStatuses(statuses);
+
+      const levels = statuses.map(d => d.warningLevel);
+      if (levels.includes('critical')) setOverallWarning('critical');
+      else if (levels.includes('high')) setOverallWarning('high');
+      else if (levels.includes('medium')) setOverallWarning('medium');
+      else if (levels.includes('low')) setOverallWarning('low');
+      else setOverallWarning('none');
+
+      setDisplayInfo(result);
+    } catch (err) {
+      console.error('[DisplayInfo] Error loading data from Firestore:', err);
+      setError(err as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [type, numericId, id]);
+
+  const clear = () => {
+    setDisplayInfo([]);
+    setDeviceStatuses([]);
+    setOverallWarning('none');
+  };
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return {
-    clear,
-    displayInfo: data,
-    isLoading: !error && !data,
+    displayInfo,
+    deviceStatuses,
+    overallWarning,
+    isLoading,
+    error,
     load,
-  }
+    clear,
+  };
 };
+
 
 export const useEquipmentDailyLog = (id: string) => {
   const [equipType,] = decomposeId(id);
@@ -252,5 +338,96 @@ export const useSearchAddr = (addr: string) => {
     loadPage,
   }
 };
+
+
+// Update the DeviceStatus interface to use number for deviceid
+interface DeviceStatus {
+  deviceid: number;  // Changed from string to number
+  avgCurrentRed: number;
+  avgCurrentGreen: number;
+  warningLevel: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  warningMessage: string;
+}
+
+// Updated calculateDeviceStatuses function
+const calculateDeviceStatuses = (displayInfo: DispalyDeviceInfoDto[]): DeviceStatus[] => {
+  const deviceMap = new Map<number, { red: number[]; green: number[] }>(); // Changed to number
+
+  // Group data by deviceid and collect all current values
+  displayInfo.forEach(item => {
+    const deviceIdNum = Number(item.deviceid); // Convert deviceid to number
+    if (isNaN(deviceIdNum)) return; // Skip if invalid number
+    
+    if (!deviceMap.has(deviceIdNum)) {
+      deviceMap.set(deviceIdNum, { red: [], green: [] });
+    }
+    const deviceData = deviceMap.get(deviceIdNum)!;
+    if (item.current_red !== undefined) deviceData.red.push(item.current_red);
+    if (item.current_green !== undefined) deviceData.green.push(item.current_green);
+  });
+
+  // Calculate averages and determine warning levels
+  const result: DeviceStatus[] = [];
+  
+  deviceMap.forEach((values, deviceid) => {
+    const avgRed = values.red.length > 0 ? 
+      values.red.reduce((sum, val) => sum + val, 0) / values.red.length : 0;
+    const avgGreen = values.green.length > 0 ? 
+      values.green.reduce((sum, val) => sum + val, 0) / values.green.length : 0;
+
+    let warningLevel: DeviceStatus['warningLevel'] = 'none';
+    let warningMessage = 'device working properly';
+
+    // Determine warning level based on green current
+    if (avgGreen < 497) {
+      warningLevel = 'critical';
+      warningMessage = 'green color in this device are not working properly';
+    } else if (avgGreen >= 560 && avgGreen <= 770) {
+      warningLevel = 'high';
+      warningMessage = 'green color in this device don\'t work properly';
+    } else if (avgGreen >= 875 && avgGreen <= 896) {
+     // warningLevel = 'none';
+      warningMessage = 'device working properly';
+    }
+
+    // Override with more critical warning if red current indicates worse condition
+    if (avgRed >= 925 && avgRed <= 935) {
+      // All good - keep previous warning
+    // } else if (avgRed >= 864 && avgRed <= 870) {
+    //   if (warningLevel === 'none') {
+    //     warningLevel = 'low';
+    //     warningMessage = '1 device doesn\'t work properly';
+    //   }
+     } 
+    else if (avgRed >= 790 && avgRed <= 796) {
+      if (warningLevel !== 'critical' && warningLevel !== 'high') {
+        warningLevel = 'medium';
+        warningMessage = '2 devices don\'t work properly';
+      }
+    } else if (avgRed >= 648 && avgRed <= 729) {
+      if (warningLevel !== 'critical') {
+        warningLevel = 'high';
+        warningMessage = 'red color in this device don\'t work properly';
+      }
+    } else if (avgRed < 576) {
+      warningLevel = 'critical';
+      warningMessage = 'Red color in this device don\'t work properly';
+    }
+
+    result.push({
+      deviceid, // Now correctly typed as number
+      avgCurrentRed: avgRed,
+      avgCurrentGreen: avgGreen,
+      warningLevel,
+      warningMessage
+    });
+  });
+
+  return result;
+};
+
+
+
+
 
 export default useAPI;
