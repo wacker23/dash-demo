@@ -1,0 +1,26 @@
+version: '3'
+services:
+  app:
+    labels:
+    - traefik.enable=true
+    - traefik.http.routers.dashboard-demo.entrypoints=websecure
+    - traefik.http.routers.dashboard-demo.service=dashboard-demo
+    - traefik.http.routers.dashboard-demo.rule=Host(`dashdemo.stl1.co.kr`)
+    - traefik.http.routers.dashboard-demo.tls.certresolver=resolver
+    - traefik.http.services.dashboard-demo.loadbalancer.server.port=3000
+    - traefik.http.services.dashboard-ademo.loadbalancer.server.scheme=http
+    image: registry.smartsignal.co.kr/dashboard-demo:latest
+    environment:
+    - NODE_ENV=production
+    - HOST=0.0.0.0
+    - PORT=3000
+    - NEXT_SHARP_PATH=/app/node_modules/sharp
+    - API_URI=http://baegundae-rocket:3000
+    - KAKAO_KEY=fe100722a808f82c00d5e1840c24dd7f
+    - TZ=Asia/Seoul
+    networks:
+    - traefik
+    restart: always
+networks:
+  traefik:
+    external: true
