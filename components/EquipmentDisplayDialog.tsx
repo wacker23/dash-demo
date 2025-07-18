@@ -563,6 +563,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                       sx={{
                         position: 'relative',
                         width: '90%',
+                        height: '50px',
                         aspectRatio: '1/1',
                         bgcolor: isActive ? 'transparent' : 'grey.300',
                         border: '1px solid',
