@@ -1,6 +1,7 @@
 import { forwardRef, Fragment, Ref, useEffect, useMemo, useState, useCallback } from 'react';
 import {
-  AppBar, Box,
+  AppBar,
+  Box,
   Container,
   Dialog,
   DialogContent,
@@ -12,20 +13,21 @@ import {
   Toolbar,
   Typography,
   Tooltip,
-  Badge
+  Card,
+  CardContent
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import WarningIcon from '@mui/icons-material/Warning';
 import Slide from '@mui/material/Slide';
-import {DataGrid, GridPaginationModel} from '@mui/x-data-grid';
+import { DataGrid, GridPaginationModel } from '@mui/x-data-grid';
 import SearchIcon from '@mui/icons-material/Search';
-import {createDisplayInfoCols} from '../lib/createColsdisplay';
+import { createDisplayInfoCols } from '../lib/createColsdisplay';
 import Chart from './Chart';
 import { useEquipmentDisplayInfo, useEquipmentInfo } from '../lib/useAPI';
-import {DatePicker, LocalizationProvider} from "@mui/x-date-pickers";
-import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
-import dayjs, {Dayjs} from "dayjs";
-import useSWR, { useSWRConfig } from 'swr';
+import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs, { Dayjs } from "dayjs";
+import useSWR from 'swr';
 import { useSnackbar } from '../lib/useSnackbar';
 import { useApp } from '../lib/useApp';
 import AddressDto from '../types/address.dto';
@@ -67,31 +69,74 @@ const Transition = forwardRef(function Transition(
   props: any,
   ref: Ref<unknown>,
 ) {
-  const {children, ...attr} = props;
+  const { children, ...attr } = props;
   return <Slide direction="up" ref={ref} {...attr}>{children}</Slide>;
-})
+});
 
-const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
+const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
   const app = useApp();
-  const {mutate, cache} = useSWRConfig();
   const snackbar = useSnackbar();
-  const {device, isLoading} = useEquipmentInfo(props.id);
+  const { device, isLoading } = useEquipmentInfo(props.id);
   const {
-    clear, 
-    displayInfo, 
-    load, 
-    isLoading: isDisplayLoading, 
+    clear,
+    displayInfo,
+    load,
+    isLoading: isDisplayLoading,
     error: displayError,
     deviceStatuses,
     overallWarning
   } = useEquipmentDisplayInfo(props.id);
   const [isLoaded, setIsLoaded] = useState(false);
   const [tabState, setTabState] = useState(1);
-  const [startDate, setStartDate] = useState<Dayjs | null>(null);
-  const [endDate, setEndDate] = useState<Dayjs | null>(null);
+  const [startDate, setStartDate] = useState<Dayjs | null>(dayjs().startOf('day'));
+  const [endDate, setEndDate] = useState<Dayjs | null>(dayjs().endOf('day'));
   const [addressKey, setAddressKey] = useState<string | null>(null);
-  const {data: address} = useSWR<AddressDto>(addressKey);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
+  const { data: address } = useSWR<AddressDto>(addressKey);
   const displayInfoCols = useMemo(() => createDisplayInfoCols(), []);
+
+  // Calculate power consumption averages
+  const powerAverages = useMemo(() => {
+    if (!displayInfo || !Array.isArray(displayInfo)) {
+      return {
+        today: { wattR: 0, wattG: 0 },
+        monthly: { wattR: 0, wattG: 0 }
+      };
+    }
+
+    const todayStart = dayjs().startOf('day');
+    const monthStart = dayjs().subtract(30, 'days').startOf('day');
+
+    const todayData = displayInfo.filter(item => 
+      dayjs(item.updated_at).isAfter(todayStart)
+    );
+    const monthlyData = displayInfo.filter(item => 
+      dayjs(item.updated_at).isAfter(monthStart)
+    );
+
+    const calculateAverage = (data: any[]) => {
+      if (data.length === 0) return { wattR: 0, wattG: 0 };
+
+      const totals = data.reduce((acc, item) => {
+        const wattR = (item.voltage_red * item.current_red) / 1000;
+        const wattG = (item.voltage_green * item.current_green) / 1000;
+        return {
+          wattR: acc.wattR + (isNaN(wattR) ? 0 : wattR),
+          wattG: acc.wattG + (isNaN(wattG) ? 0 : wattG)
+        };
+      }, { wattR: 0, wattG: 0 });
+
+      return {
+        wattR: totals.wattR / data.length,
+        wattG: totals.wattG / data.length
+      };
+    };
+
+    return {
+      today: calculateAverage(todayData),
+      monthly: calculateAverage(monthlyData)
+    };
+  }, [displayInfo]);
 
   const handleClose = async () => {
     clear();
@@ -99,7 +144,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
     props.onClose?.();
   };
 
-  const handlePaginationChange = async ({page}: GridPaginationModel) => {
+  const handlePaginationChange = async ({ page }: GridPaginationModel) => {
     // Pagination logic if needed
   };
 
@@ -110,7 +155,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
       }
     } catch (error) {
       console.error('Failed to load display info:', error);
-      snackbar.toast('error', '디스플레이 정보를 불러오는 데 실패했습니다.');
+      snackbar.toast('error', 'Failed to load display information');
     }
   }, [props.id, load, snackbar]);
 
@@ -128,24 +173,25 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
         if (device.statusRange.start) {
           const pv = dayjs(device.statusRange.start).format('YYYY-MM-DD');
           if (startDate.isBefore(pv)) {
-            snackbar.toast('warning', '조회하는 시작일이 DB에 저장된 시간보다 너무 이릅니다. 수정하세요!!');
+            snackbar.toast('warning', 'Start date is before the earliest available data');
             return;
           }
         }
         if (device.statusRange.end) {
           const pv = dayjs(device.statusRange.end).format('YYYY-MM-DD');
           if (endDate.isAfter(pv)) {
-            snackbar.toast('warning', '조회하는 종료일이 DB에 저장된 시간보다 너무 많습니다. 수정하세요!!');
+            snackbar.toast('warning', 'End date is after the latest available data');
             return;
           }
         }
       }
-      const start = startDate.format('YYYY-MM-DD');
-      const end = endDate.format('YYYY-MM-DD');
       
+      app.setValue('startDate', startDate.format('YYYY-MM-DD'));
+      app.setValue('endDate', endDate.format('YYYY-MM-DD'));
+      await loadDisplayInfo();
     } catch (error) {
       console.error('Failed to search range:', error);
-      snackbar.toast('error', '날짜 범위 검색에 실패했습니다.');
+      snackbar.toast('error', 'Failed to search date range');
     }
   };
 
@@ -158,17 +204,11 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
   }, [device]);
 
   useEffect(() => {
-    const filterStart = app.getValue('startDate') || null;
-    const filterEnd = app.getValue('endDate') || null;
-    setStartDate(!filterStart ? null : dayjs(filterStart));
-    setEndDate(!filterEnd ? null : dayjs(filterEnd));
+    const filterStart = app.getValue('startDate') || dayjs().startOf('day').format('YYYY-MM-DD');
+    const filterEnd = app.getValue('endDate') || dayjs().endOf('day').format('YYYY-MM-DD');
+    setStartDate(dayjs(filterStart));
+    setEndDate(dayjs(filterEnd));
   }, [app]);
-
-  useEffect(() => {
-    if (visible) {
-      loadDisplayInfo().catch(console.error);
-    }
-  }, [visible, loadDisplayInfo]);
 
   useEffect(() => {
     if (visible && displayInfo) {
@@ -201,16 +241,38 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
       }));
   }, [displayInfo, props.id]);
 
-  // Get device status for each device
+  const filteredGridData = useMemo(() => {
+    let result = [...gridData];
+    
+    if (selectedDeviceId !== null) {
+      result = result.filter(item => Number(item.deviceid) === selectedDeviceId);
+    }
+    
+    if (startDate && endDate) {
+      const startTime = startDate.startOf('day').valueOf();
+      const endTime = endDate.endOf('day').valueOf();
+      
+      result = result.filter(item => {
+        const itemTime = new Date(item.receive_date).getTime();
+        return itemTime >= startTime && itemTime <= endTime;
+      });
+    }
+    
+    return result;
+  }, [gridData, selectedDeviceId, startDate, endDate]);
+
   const getDeviceStatus = (deviceId: number) => {
     return deviceStatuses.find(status => status.deviceid === deviceId);
   };
 
-  // Get unique device IDs for the grid
   const activeDeviceIds = useMemo(() => {
     if (!displayInfo || !Array.isArray(displayInfo)) return new Set<number>();
     return new Set(displayInfo.map(item => Number(item.deviceid)));
   }, [displayInfo]);
+
+  const handleDeviceClick = (deviceId: number) => {
+    setSelectedDeviceId(prev => prev === deviceId ? null : deviceId);
+  };
 
   return (
     <Dialog
@@ -227,13 +289,14 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
             <CloseIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
-            {`장비(${props.id}) 장치 상태 정보`}
+            {`장비 (${props.id}) 상태 정보`}
           </Typography>
           <Box sx={{ ml: 2, flexGrow: 1, flexDirection: 'row' }}>
             {device && (
               <Typography variant={'subtitle1'} sx={{ fontSize: { xs: '.75rem', sm: '1rem' } }}>
                 {device.location.name}
-                {deviceCount > 0 && ` (${deviceCount}개 장치)`}
+                {deviceCount > 0 && ` (${deviceCount} devices)`}
+                {selectedDeviceId !== null && ` - 선택한 device: ${selectedDeviceId}`}
               </Typography>
             )}
             {address && (
@@ -242,17 +305,16 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
               </Typography>
             )}
           </Box>
-          {/* Overall Warning Indicator */}
           {overallWarning && (
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
               backgroundColor: (() => {
-              if (overallWarning.includes('critical')) return 'error.main'; // Critical - Red
-              if (overallWarning.includes('high')) return 'error.light'; // High - Light Red
-              if (overallWarning.includes('medium')) return 'warning.main'; // Medium - Orange
-              if (overallWarning.includes('low')) return 'warning.light'; // Low - Yellow
-              return 'success.main'; // Default/None - Green
+                if (overallWarning.includes('critical')) return 'error.main';
+                if (overallWarning.includes('high')) return 'error.light';
+                if (overallWarning.includes('medium')) return 'warning.main';
+                if (overallWarning.includes('low')) return 'warning.light';
+                return 'success.main';
               })(),
               px: 1,
               borderRadius: 1,
@@ -271,76 +333,68 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                 display: 'block',
               },
             }}>
-            <>
-              {device && (
-                <Grid container>
-                  <Grid item xs={12}>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      <Box display={'flex'} alignItems={'center'}>
-                        <Paper>
-                          <DatePicker
-                            sx={{
-                              '& .MuiInputBase-input': {
-                                py: 0.5,
-                                width: 90,
+            {device && (
+              <Grid container>
+                <Grid item xs={12}>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <Box display={'flex'} alignItems={'center'}>
+                      <Paper>
+                        <DatePicker
+                          sx={{
+                            '& .MuiInputBase-input': {
+                              py: 0.5,
+                              width: 90,
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '1.2rem',
+                              '&.MuiInputLabel-outlined': {
+                                lineHeight: '1.1rem',
                               },
-                              '& .MuiInputLabel-root': {
-                                fontSize: '1.2rem',
-                                '&.MuiInputLabel-outlined': {
-                                  lineHeight: '1.1rem',
-                                },
+                            },
+                          }}
+                          label={'Start Date'}
+                          minDate={device.statusRange?.start ? dayjs(device.statusRange.start) : undefined}
+                          maxDate={device.statusRange?.end ? dayjs(device.statusRange.end) : undefined}
+                          value={startDate}
+                          onChange={value => {
+                            setStartDate(value);
+                          }} />
+                      </Paper>
+                      <Box mx={1}>-</Box>
+                      <Paper>
+                        <DatePicker
+                          sx={{
+                            '& .MuiInputBase-input': {
+                              py: 0.5,
+                              width: 90,
+                            },
+                            '& .MuiInputLabel-root': {
+                              fontSize: '1.2rem',
+                              '&.MuiInputLabel-outlined': {
+                                lineHeight: '1.1rem',
                               },
-                            }}
-                            label={'시작일'}
-                            minDate={device.statusRange?.start ? dayjs(device.statusRange.start) : undefined}
-                            maxDate={device.statusRange?.end ? dayjs(device.statusRange.end) : undefined}
-                            value={startDate}
-                            onChange={value => {
-                              setStartDate(value);
-                              if (value) {
-                                app.setValue('startDate', value.format('YYYY-MM-DD'));
-                              }
-                            }} />
-                        </Paper>
-                        <Box mx={1}>-</Box>
-                        <Paper>
-                          <DatePicker
-                            sx={{
-                              '& .MuiInputBase-input': {
-                                py: 0.5,
-                                width: 90,
-                              },
-                              '& .MuiInputLabel-root': {
-                                fontSize: '1.2rem',
-                                '&.MuiInputLabel-outlined': {
-                                  lineHeight: '1.1rem',
-                                },
-                              },
-                            }}
-                            label={'종료일'}
-                            minDate={startDate}
-                            maxDate={device.statusRange?.end ? dayjs(device.statusRange.end) : undefined}
-                            value={endDate}
-                            onChange={value => {
-                              setEndDate(value);
-                              if (value) {
-                                app.setValue('endDate', value.format('YYYY-MM-DD'));
-                              }
-                            }} />
-                        </Paper>
-                        <IconButton
-                          edge={'start'}
-                          color={'inherit'}
-                          sx={{mx: 1}}
-                          onClick={handleSearchRange}>
-                          <SearchIcon />
-                        </IconButton>
-                      </Box>
-                    </LocalizationProvider>
-                  </Grid>
+                            },
+                          }}
+                          label={'End Date'}
+                          minDate={startDate}
+                          maxDate={device.statusRange?.end ? dayjs(device.statusRange.end) : undefined}
+                          value={endDate}
+                          onChange={value => {
+                            setEndDate(value);
+                          }} />
+                      </Paper>
+                      <IconButton
+                        edge={'start'}
+                        color={'inherit'}
+                        sx={{ mx: 1 }}
+                        onClick={handleSearchRange}>
+                        <SearchIcon />
+                      </IconButton>
+                    </Box>
+                  </LocalizationProvider>
                 </Grid>
-              )}
-            </>
+              </Grid>
+            )}
           </Box>
         </Toolbar>
       </AppBar>
@@ -354,20 +408,20 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
             mt: 5
           }}>
           <Typography component="h2" variant="h6" color="primary" gutterBottom>
-            디스플레이 정보
+            Display Information
           </Typography>
           {isDisplayLoading ? (
-            <Typography>디스플레이 정보를 불러오는 중입니다...</Typography>
+            <Typography>Loading display information...</Typography>
           ) : gridData.length > 0 ? (
             <DataGrid
               columns={displayInfoCols}
               rows={gridData}
               pageSizeOptions={[100]}
               localeText={{
-                noRowsLabel: '디스플레이 정보가 없습니다.',
+                noRowsLabel: 'No display information available.',
               }} />
           ) : (
-            <Typography>디스플레이 정보가 없습니다.</Typography>
+            <Typography>No display information available.</Typography>
           )}
         </Box>
         <Container
@@ -378,142 +432,224 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
               display: 'block',
             }
           }}>
-          <Grid container sx={{mt: 5}} spacing={3}>
+          <Grid container sx={{ mt: 5 }} spacing={3}>
             <Grid item xs={12}>
               <Tabs
                 variant={'fullWidth'}
                 value={tabState}
                 onChange={(_e, value) => setTabState(value)}>
-                <Tab
-                  label={'그래프'}
-                  id={'tab-panel-1'}
-                  aria-controls={'tab-panel-1'}
-                  value={1} />
-                <Tab
-                  label={'상세 정보'}
-                  id={'tab-panel-2'}
-                  aria-controls={'tab-panel-2'}
-                  value={2} />
+                <Tab label={'그래프'} id={'tab-panel-1'} aria-controls={'tab-panel-1'} value={1} />
+                <Tab label={'상세 로그'} id={'tab-panel-2'} aria-controls={'tab-panel-2'} value={2} />
               </Tabs>
+              
               <TabPanel value={tabState} index={1}>
+                {/* Power Consumption Summary Panel */}
+                <Card sx={{ mb: 3, backgroundColor: 'background.paper', boxShadow: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      전력 소비 요약 (Power Consumption)
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} sm={6}>
+                        <Paper sx={{ p: 2, backgroundColor: 'rgba(255, 99, 71, 0.08)' }}>
+                          <Typography variant="subtitle1" color="text.secondary">
+                            적색 통로
+                          </Typography>
+                          <Grid container spacing={2} sx={{ mt: 1 }}>
+                            <Grid item xs={6}>
+                              <Typography variant="caption" display="block">
+                                오늘의 평균
+                              </Typography>
+                              <Typography variant="h5" color="error.main">
+                                {powerAverages.today.wattR.toFixed(2)} W
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6}>
+                              <Typography variant="caption" display="block">
+                                30일 평균
+                              </Typography>
+                              <Typography variant="h5" color="error.main">
+                                {powerAverages.monthly.wattR.toFixed(2)} W
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <Paper sx={{ p: 2, backgroundColor: 'rgba(50, 205, 50, 0.08)' }}>
+                          <Typography variant="subtitle1" color="text.secondary">
+                            녹색 통로
+                          </Typography>
+                          <Grid container spacing={2} sx={{ mt: 1 }}>
+                            <Grid item xs={6}>
+                              <Typography variant="caption" display="block">
+                                오늘의 평균
+                              </Typography>
+                              <Typography variant="h5" color="success.main">
+                                {powerAverages.today.wattG.toFixed(2)} W
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={6}>
+                              <Typography variant="caption" display="block">
+                                30일 평균
+                              </Typography>
+                              <Typography variant="h5" color="success.main">
+                                {powerAverages.monthly.wattG.toFixed(2)} W
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                    {selectedDeviceId !== null && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        Filtered by device: {selectedDeviceId}
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                  디스플레이 정보 그래프
-                </Typography>
-                <>
-                  {isDisplayLoading ? (
-                    <Typography>데이터를 불러오는 중입니다...</Typography>
-                  ) : gridData.length > 0 ? (
-                    <Chart
-                      data={gridData}
-                      tooltipContent={({active, payload, label}) => {
-                        const receive_date = dayjs(label).format('YYYY년 MM월 DD일 HH시 mm분 ss초');
-                        return (
-                          <>
-                            {active && payload && payload.length && (
-                              <Paper sx={{px: 2, py: 1, backgroundColor: '#202123'}}>
-                                <>
-                                  {payload.map(item => (
-                                    <Fragment key={item.dataKey}>
-                                      {String(item.dataKey) === 'temp' && (
-                                        <Typography color={item.color} fontWeight={'bold'}>
-                                          {`${item.name}: ${item.value}°C`}
-                                        </Typography>
-                                      )}
-                                      {String(item.dataKey).startsWith('volt') && (
-                                        <Typography color={item.color} fontWeight={'bold'}>
-                                          {`${item.name}: ${item.value}V`}
-                                        </Typography>
-                                      )}
-                                      {String(item.dataKey).startsWith('curr') && (
-                                        <Typography color={item.color} fontWeight={'bold'}>
-                                          {`${item.name}: ${item.value}mA`}
-                                        </Typography>
-                                      )}
-                                      {String(item.dataKey).startsWith('offCurr') && (
-                                        <Typography color={item.color} fontWeight={'bold'}>
-                                          {`${item.name}: ${item.value}A`}
-                                        </Typography>
-                                      )}
-                                    </Fragment>
-                                  ))}
-                                  <Typography color={'white'}>
-                                    {receive_date}
-                                  </Typography>
-                                </>
-                              </Paper>
-                            )}
-                          </>
-                        );
-                      }}
-                      XAxis={{
-                        dataKey: 'receive_date',
-                        tickFormatter: (value: Date) =>
-                          `${value.getHours().toString().padStart(2, '0')}:${value.getMinutes().toString().padStart(2, '0')}`,
-                      }}
-                      YAxis={[ 
-                        {
-                          yAxisId: 'tempAxis',
-                          tickFormatter: value => `${value}°C`,
-                          domain: [-35, 120],
-                        },
-                        {
-                          yAxisId: 'currAxis',
-                          orientation: 'right',
-                          tickFormatter: value => `${value}A`,
-                          domain: [
-                            0,
-                            Math.max(
-                              gridData[0]?.current_red ?? 0, 
-                              gridData[0]?.current_green ?? 0,
-                              gridData[0]?.off_current_red ?? 0,
-                              gridData[0]?.off_current_green ?? 0
-                            ) * 1.2,
-                          ]
-                        },
-                        {
-                          yAxisId: 'voltAxis',
-                          orientation: 'right',
-                          tickFormatter: value => `${value}V`,
-                          domain: [24]
-                        },
-                      ]}
-                      lineData={[
-                        {key: 'temp', name: '온도', color: '#ffd700', type: 'monotone', yAxisId: 'tempAxis'},
-                        {key: 'voltR', name: '전압 R', color: '#ff6347', type: 'monotone', yAxisId: 'voltAxis'},
-                        {key: 'voltG', name: '전압 G', color: '#32cd32', type: 'monotone', yAxisId: 'voltAxis'},
-                        {key: 'currR', name: '전류 R', color: '#ff4500', type: 'monotone', yAxisId: 'currAxis'},
-                        {key: 'currG', name: '전류 G', color: '#228b22', type: 'monotone', yAxisId: 'currAxis'},
-                        {key: 'offCurrR', name: '오프 전류 R', color: '#e9967a', type: 'monotone', yAxisId: 'currAxis'},
-                        {key: 'offCurrG', name: '오프 전류 G', color: '#20b2aa', type: 'monotone', yAxisId: 'currAxis'},
-                      ]} />
-                  ) : (
-                    <Typography>표시할 데이터가 없습니다.</Typography>
+                  {selectedDeviceId !== null 
+                    ? `디스플레이 정보 그래프 (Device ${selectedDeviceId})`
+                    : '디스플레이 정보 그래프 (All Devices)'}
+                  {startDate && endDate && (
+                    <Typography variant="subtitle2" color="text.secondary">
+                      {`날짜 범위: ${startDate.format('YYYY-MM-DD')} ~ ${endDate.format('YYYY-MM-DD')}`}
+                    </Typography>
                   )}
-                </>
+                </Typography>
+                
+                {isDisplayLoading ? (
+                  <Typography>Loading data...</Typography>
+                ) : filteredGridData.length > 0 ? (
+                  <Chart
+                    data={filteredGridData}
+                    tooltipContent={({ active, payload, label }) => {
+                      const receive_date = dayjs(label).format('YYYY-MM-DD HH:mm:ss');
+                      const voltR = Number(payload?.find(item => item.dataKey === 'voltR')?.value ?? 0);
+                      const voltG = Number(payload?.find(item => item.dataKey === 'voltG')?.value ?? 0);
+                      const currR = Math.floor(Number(payload?.find(item => item.dataKey === 'currR')?.value ?? 0)) / 1000;
+                      const currG = Math.floor(Number(payload?.find(item => item.dataKey === 'currG')?.value ?? 0)) / 1000;
+                      const wattR = Math.round(voltR * currR * 100) / 100;
+                      const wattG = Math.round(voltG * currG * 100) / 100;
+
+                      return (
+                        <>
+                          {active && payload && payload.length && (
+                            <Paper sx={{ px: 2, py: 1, backgroundColor: '#202123' }}>
+                              <>
+                                {payload.map(item => (
+                                  <Fragment key={item.dataKey}>
+                                    {String(item.dataKey) === 'temp' && (
+                                      <Typography color={item.color} fontWeight={'bold'}>
+                                        {`${item.name}: ${item.value}°C`}
+                                      </Typography>
+                                    )}
+                                    {String(item.dataKey).startsWith('volt') && (
+                                      <Typography color={item.color} fontWeight={'bold'}>
+                                        {`${item.name}: ${item.value}V`}
+                                      </Typography>
+                                    )}
+                                    {String(item.dataKey) === 'currR' && (
+                                      <Typography color={item.color} fontWeight={'bold'}>
+                                        {`${item.name}: ${currR.toFixed(2)}A (${wattR}W)`}
+                                      </Typography>
+                                    )}
+                                    {String(item.dataKey) === 'currG' && (
+                                      <Typography color={item.color} fontWeight={'bold'}>
+                                        {`${item.name}: ${currG.toFixed(2)}A (${wattG}W)`}
+                                      </Typography>
+                                    )}
+                                    {String(item.dataKey).startsWith('offCurr') && (
+                                      <Typography color={item.color} fontWeight={'bold'}>
+                                        {`${item.name}: ${item.value}A`}
+                                      </Typography>
+                                    )}
+                                  </Fragment>
+                                ))}
+                                <Typography color={'white'}>
+                                  {receive_date}
+                                </Typography>
+                              </>
+                            </Paper>
+                          )}
+                        </>
+                      );
+                    }}
+                    XAxis={{
+                      dataKey: 'receive_date',
+                      tickFormatter: (value: Date) =>
+                        `${value.getHours().toString().padStart(2, '0')}:${value.getMinutes().toString().padStart(2, '0')}`,
+                    }}
+                    YAxis={[ 
+                      {
+                        yAxisId: 'tempAxis',
+                        tickFormatter: value => `${value}°C`,
+                        domain: [-35, 120],
+                      },
+                      {
+                        yAxisId: 'currAxis',
+                        orientation: 'right',
+                        tickFormatter: value => `${value}A`,
+                        domain: [
+                          0,
+                          Math.max(
+                            ...filteredGridData.map(item => 
+                              Math.max(
+                                item.current_red ?? 0, 
+                                item.current_green ?? 0,
+                                item.off_current_red ?? 0,
+                                item.off_current_green ?? 0
+                              )
+                            )
+                          ) * 1.2,
+                        ]
+                      },
+                      {
+                        yAxisId: 'voltAxis',
+                        orientation: 'right',
+                        tickFormatter: value => `${value}V`,
+                        domain: [24]
+                      },
+                    ]}
+                    lineData={[
+                      { key: 'temp', name: 'Temperature', color: '#ffd700', type: 'monotone', yAxisId: 'tempAxis' },
+                      { key: 'voltR', name: 'Voltage R', color: '#ff6347', type: 'monotone', yAxisId: 'voltAxis' },
+                      { key: 'voltG', name: 'Voltage G', color: '#32cd32', type: 'monotone', yAxisId: 'voltAxis' },
+                      { key: 'currR', name: 'Current R', color: '#ff4500', type: 'monotone', yAxisId: 'currAxis' },
+                      { key: 'currG', name: 'Current G', color: '#228b22', type: 'monotone', yAxisId: 'currAxis' },
+                      { key: 'offCurrR', name: 'Off Current R', color: '#e9967a', type: 'monotone', yAxisId: 'currAxis' },
+                      { key: 'offCurrG', name: 'Off Current G', color: '#20b2aa', type: 'monotone', yAxisId: 'currAxis' },
+                    ]} />
+                ) : (
+                  <Typography>No data to display.</Typography>
+                )}
               </TabPanel>
+              
               <TabPanel value={tabState} index={2}>
                 <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                  디스플레이 상세 정보
+                  Display Details
                 </Typography>
                 {isDisplayLoading ? (
-                  <Typography>데이터를 불러오는 중입니다...</Typography>
+                  <Typography>Loading data...</Typography>
                 ) : gridData.length > 0 ? (
                   <DataGrid
                     columns={displayInfoCols}
                     rows={gridData}
                     pageSizeOptions={[100]}
                     localeText={{
-                      noRowsLabel: '디스플레이 정보가 없습니다.',
+                      noRowsLabel: 'No display information available.',
                     }} />
                 ) : (
-                  <Typography>디스플레이 정보가 없습니다.</Typography>
+                  <Typography>No display information available.</Typography>
                 )}
               </TabPanel>
             </Grid>
           </Grid>
         </Container>
 
-        {/* Device Grid Panel with Warning Indicators */}
+        {/* Device Grid Panel */}
         <Container
           maxWidth={false}
           sx={{
@@ -524,7 +660,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
             borderTop: '1px solid rgb(5, 4, 4)'
           }}>
           <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-            장치 상태 그리드
+            장치 상태 그리드 {selectedDeviceId !== null && `(Selected device: ${selectedDeviceId})`}
           </Typography>
           <Grid container spacing={1} sx={{ justifyContent: 'center' }}>
             {Array.from({ length: 64 }).map((_, index) => {
@@ -532,6 +668,7 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
               const isActive = activeDeviceIds.has(deviceId);
               const deviceStatus = getDeviceStatus(deviceId);
               const hasWarning = deviceStatus && deviceStatus.warningLevel !== 'none';
+              const isSelected = selectedDeviceId === deviceId;
 
               return (
                 <Grid item key={index} xs={3} sm={2} md={1.5} lg={1}>
@@ -560,17 +697,20 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                     arrow
                   >
                     <Box
+                      onClick={() => handleDeviceClick(deviceId)}
                       sx={{
                         position: 'relative',
                         width: '90%',
+                        height: '50px',
                         aspectRatio: '1/1',
                         bgcolor: isActive ? 'transparent' : 'grey.300',
-                        border: '1px solid',
-                        borderColor: 'grey.400',
+                        border: '2px solid',
+                        borderColor: isSelected ? 'primary.main' : 'grey.400',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         overflow: 'hidden',
+                        cursor: 'pointer',
                         '&:hover': {
                           boxShadow: 2,
                           transform: 'scale(1.05)',
@@ -621,8 +761,9 @@ const EquipmentDisplayDialog = ({visible, ...props}: Props) => {
                                 top: 2,
                                 right: 2,
                                 color: 'warning.main',
-                                fontSize: '1rem',
-                                filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))'
+                                fontSize: '3rem',
+                                filter: 'drop-shadow(0 0 2px rgba(0,0,0,0.8))',
+                                zIndex: 2
                               }}
                             />
                           )}

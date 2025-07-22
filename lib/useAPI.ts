@@ -145,23 +145,26 @@ export const useEquipmentDisplayInfo = (id: string) => {
       );
 
       const snapshot = await getDocs(q);
-      const result: DispalyDeviceInfoDto[] = snapshot.docs.map(doc => {
-        const data = doc.data() as DocumentData;
-        return {
-          id: doc.id,
-          deviceid: data.deviceid ?? 'unknown',
-          temperature: data.temperature,
-          current_red: data.current_red,
-          current_green: data.current_green,
-          off_current_red: data.off_current_red,
-          off_current_green: data.off_current_green,
-          voltage_red: data.voltage_red,
-          voltage_green: data.voltage_green,
-          equipment_id: data.equipment_id,
-          equipment_type: data.equipment_type,
-          updated_at: data.updated_at?.toDate?.() ?? new Date(),
-        };
-      });
+const result: DispalyDeviceInfoDto[] = snapshot.docs.map(doc => {
+  const data = doc.data() as DocumentData;
+  return {
+    id: doc.id,
+    deviceid: data.deviceid ?? 'unknown',
+    temperature: data.temperature,
+    current_red: data.current_red,
+    current_green: data.current_green,
+    off_current_red: data.off_current_red,
+    off_current_green: data.off_current_green,
+    voltage_red: data.voltage_red,
+    voltage_green: data.voltage_green,
+    equipment_id: data.equipment_id,
+    equipment_type: data.equipment_type,
+    updated_at: typeof data.updated_at === 'string'
+      ? new Date(data.updated_at)
+      : data.updated_at?.toDate?.() ?? new Date(), // fallback for Firestore Timestamp
+  };
+});
+
 
       const statuses = calculateDeviceStatuses(result);
       setDeviceStatuses(statuses);
@@ -376,18 +379,18 @@ const calculateDeviceStatuses = (displayInfo: DispalyDeviceInfoDto[]): DeviceSta
       values.green.reduce((sum, val) => sum + val, 0) / values.green.length : 0;
 
     let warningLevel: DeviceStatus['warningLevel'] = 'none';
-    let warningMessage = 'device working properly';
+    let warningMessage = '장치가 제대로 작동함';
 
     // Determine warning level based on green current
     if (avgGreen < 497) {
       warningLevel = 'critical';
-      warningMessage = 'green color in this device are not working properly';
+      warningMessage = '장치의 녹색 색상이 제대로 작동하지 않습니다.';
     } else if (avgGreen >= 560 && avgGreen <= 770) {
       warningLevel = 'high';
-      warningMessage = 'green color in this device don\'t work properly';
+      warningMessage = '장치의 녹색 색상이 제대로 작동하지 않습니다.';
     } else if (avgGreen >= 875 && avgGreen <= 896) {
      // warningLevel = 'none';
-      warningMessage = 'device working properly';
+      warningMessage = '장치가 제대로 작동함';
     }
 
     // Override with more critical warning if red current indicates worse condition
@@ -402,16 +405,16 @@ const calculateDeviceStatuses = (displayInfo: DispalyDeviceInfoDto[]): DeviceSta
     else if (avgRed >= 790 && avgRed <= 796) {
       if (warningLevel !== 'critical' && warningLevel !== 'high') {
         warningLevel = 'medium';
-        warningMessage = '2 devices don\'t work properly';
+        warningMessage = '기기의 빨간색은 제대로 작동하지 않습니다';
       }
     } else if (avgRed >= 648 && avgRed <= 729) {
       if (warningLevel !== 'critical') {
         warningLevel = 'high';
-        warningMessage = 'red color in this device don\'t work properly';
+        warningMessage = '기기의 빨간색은 제대로 작동하지 않습니다';
       }
     } else if (avgRed < 576) {
       warningLevel = 'critical';
-      warningMessage = 'Red color in this device don\'t work properly';
+      warningMessage = '기기의 빨간색은 제대로 작동하지 않습니다';
     }
 
     result.push({
@@ -425,9 +428,5 @@ const calculateDeviceStatuses = (displayInfo: DispalyDeviceInfoDto[]): DeviceSta
 
   return result;
 };
-
-
-
-
 
 export default useAPI;
