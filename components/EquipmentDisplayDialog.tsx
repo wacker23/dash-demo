@@ -32,6 +32,7 @@ import { useSnackbar } from '../lib/useSnackbar';
 import { useApp } from '../lib/useApp';
 import AddressDto from '../types/address.dto';
 
+
 type Props = {
   visible: boolean;
   onClose?: () => void;
@@ -95,12 +96,18 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
   const { data: address } = useSWR<AddressDto>(addressKey);
   const displayInfoCols = useMemo(() => createDisplayInfoCols(), []);
 
-  // Calculate power consumption averages
-  const powerAverages = useMemo(() => {
+  // Calculate power consumption values
+  const powerValues = useMemo(() => {
     if (!displayInfo || !Array.isArray(displayInfo)) {
       return {
-        today: { wattR: 0, wattG: 0 },
-        monthly: { wattR: 0, wattG: 0 }
+        today: { 
+          wattR: { avg: 0, min: 0, max: 0 },
+          wattG: { avg: 0, min: 0, max: 0 }
+        },
+        monthly: { 
+          wattR: { avg: 0, min: 0, max: 0 },
+          wattG: { avg: 0, min: 0, max: 0 }
+        }
       };
     }
 
@@ -114,27 +121,32 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
       dayjs(item.updated_at).isAfter(monthStart)
     );
 
-    const calculateAverage = (data: any[]) => {
-      if (data.length === 0) return { wattR: 0, wattG: 0 };
+    const calculateValues = (data: any[]) => {
+      if (data.length === 0) return { 
+        wattR: { avg: 0, min: 0, max: 0 },
+        wattG: { avg: 0, min: 0, max: 0 }
+      };
 
-      const totals = data.reduce((acc, item) => {
-        const wattR = (item.voltage_red * item.current_red) / 1000;
-        const wattG = (item.voltage_green * item.current_green) / 1000;
-        return {
-          wattR: acc.wattR + (isNaN(wattR) ? 0 : wattR),
-          wattG: acc.wattG + (isNaN(wattG) ? 0 : wattG)
-        };
-      }, { wattR: 0, wattG: 0 });
+      const wattRValues = data.map(item => (item.voltage_red * item.current_red) / 1000).filter(val => !isNaN(val));
+      const wattGValues = data.map(item => (item.voltage_green * item.current_green) / 1000).filter(val => !isNaN(val));
 
       return {
-        wattR: totals.wattR / data.length,
-        wattG: totals.wattG / data.length
+        wattR: {
+          avg: wattRValues.reduce((sum, val) => sum + val, 0) / wattRValues.length,
+          min: Math.min(...wattRValues),
+          max: Math.max(...wattRValues)
+        },
+        wattG: {
+          avg: wattGValues.reduce((sum, val) => sum + val, 0) / wattGValues.length,
+          min: Math.min(...wattGValues),
+          max: Math.max(...wattGValues)
+        }
       };
     };
 
     return {
-      today: calculateAverage(todayData),
-      monthly: calculateAverage(monthlyData)
+      today: calculateValues(todayData),
+      monthly: calculateValues(monthlyData)
     };
   }, [displayInfo]);
 
@@ -424,15 +436,147 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
             <Typography>No display information available.</Typography>
           )}
         </Box>
-        <Container
-          maxWidth={false}
-          sx={{
-            display: 'none',
-            '@media (min-width: 960px) and (min-height: 640px)': {
-              display: 'block',
-            }
-          }}>
-          <Grid container sx={{ mt: 5 }} spacing={3}>
+
+        
+{/* Power Consumption Summary Panel - Responsive like Device Grid */}
+<Container
+  maxWidth={false}
+  sx={{
+    mt: 5,
+    p: { xs: 1, sm: 2 },
+    backgroundColor: 'background.paper',
+    borderRadius: 1,
+    boxShadow: 2,
+    border: '1px solid',
+    borderColor: 'divider'
+  }}>
+  <Typography variant="h6" gutterBottom sx={{ 
+    fontWeight: 'bold',
+    fontSize: { xs: '1rem', sm: '1.25rem' },
+    mb: 2
+  }}>
+    전력 소비 요약 (Power Consumption)
+  </Typography>
+  
+  <Grid container spacing={{ xs: 1, sm: 2 }}>
+    {/* Red Channel */}
+    <Grid item xs={12} sm={6}>
+      <Paper sx={{ 
+        p: { xs: 1, sm: 2 },
+        backgroundColor: 'rgba(255, 99, 71, 0.08)',
+        height: '100%',
+        minHeight: { xs: 'auto', sm: 140 }
+      }}>
+        <Typography variant="subtitle1" color="text.secondary" sx={{ 
+          fontSize: { xs: '0.875rem', sm: '1rem' },
+          fontWeight: 'bold'
+        }}>
+          적색 통로 (Red)
+        </Typography>
+        
+        <Grid container spacing={0.5} sx={{ mt: 1 }}>
+          {[
+            { label: '오늘의 평균', value: powerValues.today.wattR.avg.toFixed(2), color: 'error.main', size: 'h5' },
+            { label: '오늘 최소', value: powerValues.today.wattR.min.toFixed(2), color: 'error.light', size: 'h6' },
+            { label: '오늘 최대', value: powerValues.today.wattR.max.toFixed(2), color: 'error.dark', size: 'h6' },
+            { label: '30일 평균', value: powerValues.monthly.wattR.avg.toFixed(2), color: 'error.main', size: 'h5' },
+            { label: '30일 최소', value: powerValues.monthly.wattR.min.toFixed(2), color: 'error.light', size: 'h6' },
+            { label: '30일 최대', value: powerValues.monthly.wattR.max.toFixed(2), color: 'error.dark', size: 'h6' }
+          ].map((item, index) => (
+            <Grid item xs={4} key={`red-${index}`}>
+              <Typography variant="caption" display="block" sx={{
+                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                lineHeight: 1.2
+              }}>
+                {item.label}
+              </Typography>
+              <Typography variant={item.size as any} color={item.color} sx={{
+                fontSize: { 
+                  xs: item.size === 'h5' ? '0.9rem' : '0.8rem', 
+                  sm: item.size === 'h5' ? '1.1rem' : '0.9rem' 
+                },
+                wordBreak: 'keep-all'
+              }}>
+                {item.value} W
+              </Typography>
+            </Grid>
+          ))}
+        </Grid>
+      </Paper>
+    </Grid>
+
+    {/* Green Channel */}
+    <Grid item xs={12} sm={6} sx={{ mt: { xs: 1, sm: 0 } }}>
+      <Paper sx={{ 
+        p: { xs: 1, sm: 2 },
+        backgroundColor: 'rgba(50, 205, 50, 0.08)',
+        height: '100%',
+        minHeight: { xs: 'auto', sm: 140 }
+      }}>
+        <Typography variant="subtitle1" color="text.secondary" sx={{ 
+          fontSize: { xs: '0.875rem', sm: '1rem' },
+          fontWeight: 'bold'
+        }}>
+          녹색 통로 (Green)
+        </Typography>
+        
+        <Grid container spacing={0.5} sx={{ mt: 1 }}>
+          {[
+            { label: '오늘의 평균', value: powerValues.today.wattG.avg.toFixed(2), color: 'success.main', size: 'h5' },
+            { label: '오늘 최소', value: powerValues.today.wattG.min.toFixed(2), color: 'success.light', size: 'h6' },
+            { label: '오늘 최대', value: powerValues.today.wattG.max.toFixed(2), color: 'success.dark', size: 'h6' },
+            { label: '30일 평균', value: powerValues.monthly.wattG.avg.toFixed(2), color: 'success.main', size: 'h5' },
+            { label: '30일 최소', value: powerValues.monthly.wattG.min.toFixed(2), color: 'success.light', size: 'h6' },
+            { label: '30일 최대', value: powerValues.monthly.wattG.max.toFixed(2), color: 'success.dark', size: 'h6' }
+          ].map((item, index) => (
+            <Grid item xs={4} key={`green-${index}`}>
+              <Typography variant="caption" display="block" sx={{
+                fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                lineHeight: 1.2
+              }}>
+                {item.label}
+              </Typography>
+              <Typography variant={item.size as any} color={item.color} sx={{
+                fontSize: { 
+                  xs: item.size === 'h5' ? '0.9rem' : '0.8rem', 
+                  sm: item.size === 'h5' ? '1.1rem' : '0.9rem' 
+                },
+                wordBreak: 'keep-all'
+              }}>
+                {item.value} W
+              </Typography>
+            </Grid>
+          ))}
+        </Grid>
+      </Paper>
+    </Grid>
+  </Grid>
+
+  {selectedDeviceId !== null && (
+    <Typography variant="caption" color="text.secondary" sx={{ 
+      mt: 1, 
+      display: 'block',
+      fontSize: { xs: '0.7rem', sm: '0.75rem' }
+    }}>
+      Filtered by device: {selectedDeviceId}
+    </Typography>
+  )}
+</Container>
+
+
+
+      <Container
+            maxWidth={false}
+            sx={{
+              position: 'relative',
+              top: '30px',
+              display: 'none',
+              '@media (min-width: 960px) and (min-height: 640px)': {
+                display: 'block',
+              }
+            }}
+          >
+          <Grid container spacing={3}>
             <Grid item xs={12}>
               <Tabs
                 variant={'fullWidth'}
@@ -443,89 +587,40 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
               </Tabs>
               
               <TabPanel value={tabState} index={1}>
-                {/* Power Consumption Summary Panel */}
-                <Card sx={{ mb: 3, backgroundColor: 'background.paper', boxShadow: 2 }}>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      전력 소비 요약 (Power Consumption)
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Paper sx={{ p: 2, backgroundColor: 'rgba(255, 99, 71, 0.08)' }}>
-                          <Typography variant="subtitle1" color="text.secondary">
-                            적색 통로
-                          </Typography>
-                          <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" display="block">
-                                오늘의 평균
-                              </Typography>
-                              <Typography variant="h5" color="error.main">
-                                {powerAverages.today.wattR.toFixed(2)} W
-                              </Typography>
-                            </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" display="block">
-                                30일 평균
-                              </Typography>
-                              <Typography variant="h5" color="error.main">
-                                {powerAverages.monthly.wattR.toFixed(2)} W
-                              </Typography>
-                            </Grid>
-                          </Grid>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Paper sx={{ p: 2, backgroundColor: 'rgba(50, 205, 50, 0.08)' }}>
-                          <Typography variant="subtitle1" color="text.secondary">
-                            녹색 통로
-                          </Typography>
-                          <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" display="block">
-                                오늘의 평균
-                              </Typography>
-                              <Typography variant="h5" color="success.main">
-                                {powerAverages.today.wattG.toFixed(2)} W
-                              </Typography>
-                            </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" display="block">
-                                30일 평균
-                              </Typography>
-                              <Typography variant="h5" color="success.main">
-                                {powerAverages.monthly.wattG.toFixed(2)} W
-                              </Typography>
-                            </Grid>
-                          </Grid>
-                        </Paper>
-                      </Grid>
-                    </Grid>
-                    {selectedDeviceId !== null && (
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        Filtered by device: {selectedDeviceId}
+                  <Typography component="h2" variant="h6" color="primary" gutterBottom>
+                    {selectedDeviceId !== null 
+                      ? `디스플레이 정보 그래프 (Device ${selectedDeviceId})`
+                      : '디스플레이 정보 그래프 - Select a device to view data'}
+                    {startDate && endDate && selectedDeviceId !== null && (
+                      <Typography variant="subtitle2" color="text.secondary">
+                        {`날짜 범위: ${startDate.format('YYYY-MM-DD')} ~ ${endDate.format('YYYY-MM-DD')}`}
                       </Typography>
                     )}
-                  </CardContent>
-                </Card>
-
-                <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                  {selectedDeviceId !== null 
-                    ? `디스플레이 정보 그래프 (Device ${selectedDeviceId})`
-                    : '디스플레이 정보 그래프 (All Devices)'}
-                  {startDate && endDate && (
-                    <Typography variant="subtitle2" color="text.secondary">
-                      {`날짜 범위: ${startDate.format('YYYY-MM-DD')} ~ ${endDate.format('YYYY-MM-DD')}`}
-                    </Typography>
-                  )}
-                </Typography>
-                
-                {isDisplayLoading ? (
-                  <Typography>Loading data...</Typography>
-                ) : filteredGridData.length > 0 ? (
-                  <Chart
-                    data={filteredGridData}
-                    tooltipContent={({ active, payload, label }) => {
+                  </Typography>
+                  
+                  {isDisplayLoading ? (
+                    <Typography>Loading data...</Typography>
+                  ) : selectedDeviceId === null ? (
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      height: '100%',
+                      p: 4,
+                      textAlign: 'center'
+                    }}>
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        No device selected
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        아래 그리드에서 장치를 선택하여 해당 데이터를 확인하세요.
+                      </Typography>
+                    </Box>
+                  ) : filteredGridData.length > 0 ? (
+                    <Chart
+                      data={filteredGridData}
+                      tooltipContent={({ active, payload, label }) => {
                       const receive_date = dayjs(label).format('YYYY-MM-DD HH:mm:ss');
                       const voltR = Number(payload?.find(item => item.dataKey === 'voltR')?.value ?? 0);
                       const voltG = Number(payload?.find(item => item.dataKey === 'voltG')?.value ?? 0);
@@ -591,7 +686,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                       {
                         yAxisId: 'currAxis',
                         orientation: 'right',
-                        tickFormatter: value => `${value}A`,
+                        tickFormatter: value => `${Math.floor(value) / 1000}A`,
                         domain: [
                           0,
                           Math.max(
@@ -653,7 +748,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
         <Container
           maxWidth={false}
           sx={{
-            mt: 2,
+            mt: 5,
             p: 2,
             backgroundColor: '#1c1c1c',
             borderRadius: 1,
