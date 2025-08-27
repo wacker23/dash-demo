@@ -28,7 +28,7 @@ const formatAmpWithInstalled = (fieldKey: string) => (params: GridValueFormatter
   const current = typeof params.value === 'string' ? params.value.split(',')[0] : params.value;
 
   if (installed !== undefined && current !== undefined) {
-    return `${installed}mA / ${current}mA`;
+    return ` ${current}mA /${installed}mA`;
   }
 
   return '-';
@@ -166,7 +166,7 @@ tempStat: {
     name: '펌웨어 리셋',
   },
   dispErrId: {
-    name: '표출부 오류 ID',
+    name: '표출부 응답 수',
   },
   dispAbnormalStat: {
     name: '표출부 이상 상태',
@@ -221,9 +221,14 @@ export const createStatusCols = (type: EquipmentTypeKey): GridColDef[] => {
       align: 'center',
       headerAlign: 'center',
       minWidth: 70,
-      valueGetter: ({row}) =>
-        `${(Number(row['voltR']) + Number(row['voltG'])) / 2}V`,
+      valueGetter: ({row}) =>{
+        const v = (Number(row["voltR"]) + Number(row["voltG"])) / 2;
+        return `${v.toFixed(1)}V`;
+      }
+       
     },
+
+
     {
       field: 'greenWatt',
       headerName: '녹색 소비전력',
@@ -232,7 +237,8 @@ export const createStatusCols = (type: EquipmentTypeKey): GridColDef[] => {
       headerAlign: 'center',
       minWidth: 95,
       valueGetter: ({row}) =>{
-        return `${Number(row['voltG']) * Number(row['ampG']) / 1000}W`;
+        const w = Number(row['voltG']) * Number(row['ampG']) / 1000;
+        return `${w.toFixed(2)}W`;
       },
     },
     {
@@ -243,7 +249,8 @@ export const createStatusCols = (type: EquipmentTypeKey): GridColDef[] => {
       headerAlign: 'center',
       minWidth: 95,
       valueGetter: ({row}) => {
-        return `${Number(row['voltR']) * Number(row['ampR']) / 1000}W`;
+        const w = Number(row['voltR']) * Number(row['ampR']) / 1000;
+        return `${w.toFixed(2)}W`;
       },
     },
     ...cols,
