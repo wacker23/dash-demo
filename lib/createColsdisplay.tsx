@@ -60,7 +60,8 @@ export const createDisplayInfoCols = (): GridColDef[] => {
       headerAlign: "center",
       minWidth: 70,
       valueGetter: ({ row }) => {
-        return `${(Number(row["voltR"]) + Number(row["voltG"])) / 2}V`;
+        const v = (Number(row["voltR"]) + Number(row["voltG"])) / 2;
+        return `${v.toFixed(1)}V`;
       },
     },
     {
@@ -71,7 +72,8 @@ export const createDisplayInfoCols = (): GridColDef[] => {
       headerAlign: "center",
       minWidth: 95,
       valueGetter: ({ row }) => {
-        return `${(Number(row["voltR"]) * Number(row["currR"])) / 1000}W`;
+        const w = (Number(row["voltR"]) * Number(row["currR"])) / 1000;
+        return `${w.toFixed(2)}W`;
       },
     },
     {
@@ -82,7 +84,8 @@ export const createDisplayInfoCols = (): GridColDef[] => {
       headerAlign: "center",
       minWidth: 95,
       valueGetter: ({ row }) => {
-        return `${(Number(row["voltG"]) * Number(row["currG"])) / 1000}W`;
+        const w = (Number(row["voltG"]) * Number(row["currG"])) / 1000;
+        return `${w.toFixed(2)}W`;
       },
     },
   ];
