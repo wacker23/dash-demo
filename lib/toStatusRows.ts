@@ -63,7 +63,7 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
           break;
 
         case 'version':
-          newValue = `${Number(value) / 10}`;
+          newValue = `${Number(value) / 100}`;
           break;
 
         case 'timestamp':
