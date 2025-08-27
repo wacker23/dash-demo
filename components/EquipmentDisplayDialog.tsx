@@ -255,21 +255,28 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
 
   const filteredGridData = useMemo(() => {
     let result = [...gridData];
-    
+
     if (selectedDeviceId !== null) {
       result = result.filter(item => Number(item.deviceid) === selectedDeviceId);
     }
-    
-    if (startDate && endDate) {
+
+    // If both startDate and endDate are null, show last 24h
+    if (!startDate && !endDate) {
+      const now = dayjs();
+      const last24h = now.subtract(24, 'hour').valueOf();
+      result = result.filter(item => {
+        const itemTime = new Date(item.receive_date).getTime();
+        return itemTime >= last24h && itemTime <= now.valueOf();
+      });
+    } else if (startDate && endDate) {
       const startTime = startDate.startOf('day').valueOf();
       const endTime = endDate.endOf('day').valueOf();
-      
       result = result.filter(item => {
         const itemTime = new Date(item.receive_date).getTime();
         return itemTime >= startTime && itemTime <= endTime;
       });
     }
-    
+
     return result;
   }, [gridData, selectedDeviceId, startDate, endDate]);
 
@@ -426,12 +433,13 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
             <Typography>Loading display information...</Typography>
           ) : gridData.length > 0 ? (
             <DataGrid
-              columns={displayInfoCols}
-              rows={gridData}
-              pageSizeOptions={[100]}
-              localeText={{
-                noRowsLabel: 'No display information available.',
-              }} />
+            columns={displayInfoCols}
+            rows={gridData}
+            sortModel={[{ field: 'receive_date', sort: 'desc' }]}
+            pageSizeOptions={[100]}
+            localeText={{
+              noRowsLabel: 'No display information available.',
+            }} />
           ) : (
             <Typography>No display information available.</Typography>
           )}
@@ -443,126 +451,196 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
   maxWidth={false}
   sx={{
     mt: 5,
-    p: { xs: 1, sm: 2 },
+    p: { xs: 2, sm: 4 },
     backgroundColor: 'background.paper',
-    borderRadius: 1,
-    boxShadow: 2,
+    borderRadius: 2,
+    boxShadow: 3,
     border: '1px solid',
-    borderColor: 'divider'
-  }}>
-  <Typography variant="h6" gutterBottom sx={{ 
-    fontWeight: 'bold',
-    fontSize: { xs: '1rem', sm: '1.25rem' },
-    mb: 2
-  }}>
+    borderColor: 'divider',
+  }}
+>
+  <Typography
+    variant="h4"
+    gutterBottom
+    sx={{
+      fontWeight: 500,
+      fontSize: { xs: '1.75rem', sm: '2rem' },
+      mb: 3,
+      color: 'white',  // Changed to white
+    }}
+  >
     전력 소비 요약 (Power Consumption)
   </Typography>
-  
-  <Grid container spacing={{ xs: 1, sm: 2 }}>
+
+  <Grid container spacing={4}>
     {/* Red Channel */}
-    <Grid item xs={12} sm={6}>
-      <Paper sx={{ 
-        p: { xs: 1, sm: 2 },
-        backgroundColor: 'rgba(255, 99, 71, 0.08)',
-        height: '100%',
-        minHeight: { xs: 'auto', sm: 140 }
-      }}>
-        <Typography variant="subtitle1" color="text.secondary" sx={{ 
-          fontSize: { xs: '0.875rem', sm: '1rem' },
-          fontWeight: 'bold'
-        }}>
+    <Grid item xs={12} md={6}>
+      <Paper
+        elevation={2}
+        sx={{
+          p: { xs: 2, sm: 3 },
+          backgroundColor: 'rgba(255, 99, 71, 0.05)',
+          borderRadius: 2,
+        }}
+      >
+        <Typography
+          variant="h5"
+          sx={{ 
+            fontWeight: 'bold', 
+            mb: 3, 
+            fontSize: '1.5rem',
+            color: 'white',  // Changed to white
+          }}
+        >
           적색 통로 (Red)
         </Typography>
-        
-        <Grid container spacing={0.5} sx={{ mt: 1 }}>
-          {[
-            { label: '오늘의 평균', value: powerValues.today.wattR.avg.toFixed(2), color: 'error.main', size: 'h5' },
-            { label: '오늘 최소', value: powerValues.today.wattR.min.toFixed(2), color: 'error.light', size: 'h6' },
-            { label: '오늘 최대', value: powerValues.today.wattR.max.toFixed(2), color: 'error.dark', size: 'h6' },
-            { label: '30일 평균', value: powerValues.monthly.wattR.avg.toFixed(2), color: 'error.main', size: 'h5' },
-            { label: '30일 최소', value: powerValues.monthly.wattR.min.toFixed(2), color: 'error.light', size: 'h6' },
-            { label: '30일 최대', value: powerValues.monthly.wattR.max.toFixed(2), color: 'error.dark', size: 'h6' }
-          ].map((item, index) => (
-            <Grid item xs={4} key={`red-${index}`}>
-              <Typography variant="caption" display="block" sx={{
-                fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                lineHeight: 1.2
-              }}>
-                {item.label}
-              </Typography>
-              <Typography variant={item.size as any} color={item.color} sx={{
-                fontSize: { 
-                  xs: item.size === 'h5' ? '0.9rem' : '0.8rem', 
-                  sm: item.size === 'h5' ? '1.1rem' : '0.9rem' 
-                },
-                wordBreak: 'keep-all'
-              }}>
-                {item.value} W
-              </Typography>
-            </Grid>
-          ))}
-        </Grid>
+
+        {/* Today */}
+        <Box sx={{ mb: 3 }}>
+          <Typography
+            variant="subtitle1"
+            sx={{ 
+              fontWeight: 600, 
+              mb: 2, 
+              color: 'white',  // Changed to white
+              fontSize: '1.1rem' 
+            }}
+          >
+            오늘 (Today)
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+              평균: {powerValues.today.wattR.avg.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.light' }}>
+              최소: {powerValues.today.wattR.min.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.dark' }}>
+              최대: {powerValues.today.wattR.max.toFixed(2)} W
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Monthly */}
+        <Box>
+          <Typography
+            variant="subtitle1"
+            sx={{ 
+              fontWeight: 600, 
+              mb: 2, 
+              color: 'white',  // Changed to white
+              fontSize: '1.1rem' 
+            }}
+          >
+            최근 30일 (Last 30 Days)
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+              평균: {powerValues.monthly.wattR.avg.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.light' }}>
+              최소: {powerValues.monthly.wattR.min.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.dark' }}>
+              최대: {powerValues.monthly.wattR.max.toFixed(2)} W
+            </Typography>
+          </Box>
+        </Box>
       </Paper>
     </Grid>
 
     {/* Green Channel */}
-    <Grid item xs={12} sm={6} sx={{ mt: { xs: 1, sm: 0 } }}>
-      <Paper sx={{ 
-        p: { xs: 1, sm: 2 },
-        backgroundColor: 'rgba(50, 205, 50, 0.08)',
-        height: '100%',
-        minHeight: { xs: 'auto', sm: 140 }
-      }}>
-        <Typography variant="subtitle1" color="text.secondary" sx={{ 
-          fontSize: { xs: '0.875rem', sm: '1rem' },
-          fontWeight: 'bold'
-        }}>
+    <Grid item xs={12} md={6}>
+      <Paper
+        elevation={2}
+        sx={{
+          p: { xs: 2, sm: 3 },
+          backgroundColor: 'rgba(50, 205, 50, 0.05)',
+          borderRadius: 2,
+        }}
+      >
+        <Typography
+          variant="h5"
+          sx={{ 
+            fontWeight: 'bold', 
+            mb: 3, 
+            fontSize: '1.5rem',
+            color: 'white',  // Changed to white
+          }}
+        >
           녹색 통로 (Green)
         </Typography>
-        
-        <Grid container spacing={0.5} sx={{ mt: 1 }}>
-          {[
-            { label: '오늘의 평균', value: powerValues.today.wattG.avg.toFixed(2), color: 'success.main', size: 'h5' },
-            { label: '오늘 최소', value: powerValues.today.wattG.min.toFixed(2), color: 'success.light', size: 'h6' },
-            { label: '오늘 최대', value: powerValues.today.wattG.max.toFixed(2), color: 'success.dark', size: 'h6' },
-            { label: '30일 평균', value: powerValues.monthly.wattG.avg.toFixed(2), color: 'success.main', size: 'h5' },
-            { label: '30일 최소', value: powerValues.monthly.wattG.min.toFixed(2), color: 'success.light', size: 'h6' },
-            { label: '30일 최대', value: powerValues.monthly.wattG.max.toFixed(2), color: 'success.dark', size: 'h6' }
-          ].map((item, index) => (
-            <Grid item xs={4} key={`green-${index}`}>
-              <Typography variant="caption" display="block" sx={{
-                fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                lineHeight: 1.2
-              }}>
-                {item.label}
-              </Typography>
-              <Typography variant={item.size as any} color={item.color} sx={{
-                fontSize: { 
-                  xs: item.size === 'h5' ? '0.9rem' : '0.8rem', 
-                  sm: item.size === 'h5' ? '1.1rem' : '0.9rem' 
-                },
-                wordBreak: 'keep-all'
-              }}>
-                {item.value} W
-              </Typography>
-            </Grid>
-          ))}
-        </Grid>
+
+        {/* Today */}
+        <Box sx={{ mb: 3 }}>
+          <Typography
+            variant="subtitle1"
+            sx={{ 
+              fontWeight: 600, 
+              mb: 2, 
+              color: 'white',  // Changed to white
+              fontSize: '1.1rem' 
+            }}
+          >
+            오늘 (Today)
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+              평균: {powerValues.today.wattG.avg.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.light' }}>
+              최소: {powerValues.today.wattG.min.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
+              최대: {powerValues.today.wattG.max.toFixed(2)} W
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Monthly */}
+        <Box>
+          <Typography
+            variant="subtitle1"
+            sx={{ 
+              fontWeight: 600, 
+              mb: 2, 
+              color: 'white',  // Changed to white
+              fontSize: '1.1rem' 
+            }}
+          >
+            최근 30일 (Last 30 Days)
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+              평균: {powerValues.monthly.wattG.avg.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.light' }}>
+              최소: {powerValues.monthly.wattG.min.toFixed(2)} W
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
+              최대: {powerValues.monthly.wattG.max.toFixed(2)} W
+            </Typography>
+          </Box>
+        </Box>
       </Paper>
     </Grid>
   </Grid>
 
   {selectedDeviceId !== null && (
-    <Typography variant="caption" color="text.secondary" sx={{ 
-      mt: 1, 
-      display: 'block',
-      fontSize: { xs: '0.7rem', sm: '0.75rem' }
-    }}>
+    <Typography
+      variant="body2"
+      sx={{
+        mt: 4,
+        fontStyle: 'italic',
+        textAlign: 'right',
+        fontSize: { xs: '0.9rem', sm: '1rem' },
+        color: 'white',  // Changed to white
+      }}
+    >
       Filtered by device: {selectedDeviceId}
     </Typography>
   )}
 </Container>
-
 
 
       <Container
@@ -732,6 +810,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                   <DataGrid
                     columns={displayInfoCols}
                     rows={gridData}
+                    sortModel={[{ field: 'receive_date', sort: 'desc' }]}
                     pageSizeOptions={[100]}
                     localeText={{
                       noRowsLabel: 'No display information available.',
@@ -764,6 +843,21 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
               const deviceStatus = getDeviceStatus(deviceId);
               const hasWarning = deviceStatus && deviceStatus.warningLevel !== 'none';
               const isSelected = selectedDeviceId === deviceId;
+
+              // Find the latest data time for this device
+              // Determine device button color logic
+              const deviceRows = gridData.filter(item => Number(item.deviceid) === deviceId);
+              let isDisconnected = false;
+              let isEmpty = false;
+              if (deviceRows.length === 0) {
+                isEmpty = true;
+              } else {
+                const latest = Math.max(...deviceRows.map(item => new Date(item.receive_date).getTime()));
+                const now = Date.now();
+                if (now - latest > 12 * 60 * 60 * 1000) {
+                  isDisconnected = true;
+                }
+              }
 
               return (
                 <Grid item key={index} xs={3} sm={2} md={1.5} lg={1}>
@@ -798,7 +892,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                         width: '90%',
                         height: '50px',
                         aspectRatio: '1/1',
-                        bgcolor: isActive ? 'transparent' : 'grey.300',
+                        bgcolor: isEmpty ? 'common.white' : (isDisconnected ? 'grey.500' : (isActive ? 'transparent' : 'grey.300')),
                         border: '2px solid',
                         borderColor: isSelected ? 'primary.main' : 'grey.400',
                         display: 'flex',
@@ -806,13 +900,14 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                         justifyContent: 'center',
                         overflow: 'hidden',
                         cursor: 'pointer',
+                        opacity: isDisconnected ? 0.5 : 1,
                         '&:hover': {
                           boxShadow: 2,
                           transform: 'scale(1.05)',
                           transition: 'all 0.2s'
                         }
                       }}>
-                      {isActive ? (
+                      {isActive && !isDisconnected && !isEmpty ? (
                         <>
                           <Box
                             sx={{
@@ -867,7 +962,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                         <Typography
                           variant="body2"
                           sx={{
-                            color: 'grey.600',
+                            color: isEmpty ? 'grey.400' : 'grey.600',
                             fontSize: '0.75rem',
                             '@media (min-width:600px)': {
                               fontSize: '0.875rem'
