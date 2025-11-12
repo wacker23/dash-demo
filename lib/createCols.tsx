@@ -93,18 +93,18 @@ const fieldConfig: { [p: string]: { name: string, formatter?: (params: GridValue
 }, */
 
 tempStat: {
-    name: '온도 상태',
+    name: '온도',
     formatter: (params): string =>
       `${params.value}°C`,
   },
 
   powerLimit: {
-    name: '전원 리미터',
+    name: '전원(MAX)',
     formatter: (params): string =>
       `${params.value}W`,
   },
   dirStat: {
-    name: '설치 방향 상태',
+    name: '방향',
     formatter: (params): string => {
       const status = params.value * 1;
       switch (status) {
@@ -155,21 +155,21 @@ tempStat: {
     }
   },
   commStat: {
-    name: 'RS485 통신 상태',
+    name: 'RS485',
     formatter: (params): string =>
       params.value ? 'ON' : 'OFF',
   },
   pubNo: {
-    name: '토픽 발행 수',
+    name: '토픽',
   },
   firmwareResetCount: {
-    name: '펌웨어 리셋',
+    name: '리셋',
   },
   dispErrId: {
-    name: '표출부 응답 수',
+    name: '오류 번호',
   },
   dispAbnormalStat: {
-    name: '표출부 이상 상태',
+    name: '오류ID',
   },
   version: {
     name: '버전',
@@ -182,6 +182,34 @@ tempStat: {
 type Props = {
   onViewStatus?: (id: number, type: string, cols: GridColDef[], rows: StatusRowsDto[]) => void;
 }
+
+// Power consumption column definitions - reusable
+export const createPowerConsumptionCols = (): GridColDef[] => [
+  {
+    field: 'greenWatt',
+    headerName: '녹색 소비전력',
+    flex: 1,
+    align: 'center',
+    headerAlign: 'center',
+    minWidth: 95,
+    valueGetter: ({row}) =>{
+      const w = Number(row['voltG']) * Number(row['ampG']) / 1000;
+      return `${w.toFixed(2)}W`;
+    },
+  },
+  {
+    field: 'redWatt',
+    headerName: '적색 소비전력',
+    flex: 1,
+    align: 'center',
+    headerAlign: 'center',
+    minWidth: 95,
+    valueGetter: ({row}) => {
+      const w = Number(row['voltR']) * Number(row['ampR']) / 1000;
+      return `${w.toFixed(2)}W`;
+    },
+  },
+];
 
 export const createStatusCols = (type: EquipmentTypeKey): GridColDef[] => {
   if (EquipmentStatusFields[type].length === 0) {
@@ -254,7 +282,7 @@ export const createStatusCols = (type: EquipmentTypeKey): GridColDef[] => {
       },
     },
     ...cols,
-    {
+   /*  {
       field: 'state',
       headerName: '장비 상태',
       flex: 1,
@@ -269,7 +297,7 @@ export const createStatusCols = (type: EquipmentTypeKey): GridColDef[] => {
       align: 'center',
       headerAlign: 'center',
       valueGetter: ({value}) => !value ? '양호' : '불량',
-    }
+    } */
   ];
 };
 
