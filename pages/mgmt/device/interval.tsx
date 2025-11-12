@@ -139,7 +139,7 @@ const Page: NextPage = () => {
   };
 
   return (
-    <Layout title={"전송 주기 설정"} menuBar={[]}>
+    <Layout title={"모듈 상태"} menuBar={[]}>
       <Grid item xs={12}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, gap: 2, flexWrap: 'wrap' }}>
           <SelectRegion
