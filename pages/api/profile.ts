@@ -17,7 +17,7 @@ export default async function handler(
   const user = await result.json() as UserDto;
   const menus = user.privileged ? [
       {
-        name: '전송주기 설정',
+        name: '모듈 상태',
         path: '/mgmt/device/interval',
       },
       {
