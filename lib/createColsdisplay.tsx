@@ -6,6 +6,9 @@ import { EquipmentTypeKey } from "../types/constants";
 const fieldConfig: {
   [key: string]: { name: string; formatter?: (params: GridValueFormatterParams<any>) => string };
 } = {
+  "device ID": {
+    name: "Device ID",
+  },
   voltR: {
     name: "전압 R",
     formatter: (params) => `${params.value}V`,
@@ -15,29 +18,26 @@ const fieldConfig: {
     formatter: (params) => `${params.value}V`,
   },
   currR: {
-    name: "전류 R",
-    formatter: (params) => `${params.value}mA`,
+    name: "전류 R (Ad.)",
+    formatter: (params) => `${params.value} `,
   },
   currG: {
-    name: "전류 G",
-    formatter: (params) => `${params.value}mA`,
+    name: "전류 G (Ad.)",
+    formatter: (params) => `${params.value}`,
   },
   offCurrR: {
-    name: "오프 전류 R",
-    formatter: (params) => `${params.value}mA`,
+    name: "오프 전류 R (Ad.)",
+    formatter: (params) => `${params.value} `,
   },
   offCurrG: {
-    name: "오프 전류 G",
-    formatter: (params) => `${params.value}mA`,
+    name: "오프 전류 G (Ad.)",
+    formatter: (params) => `${params.value} `,
   },
   temp: {
     name: "온도",
     formatter: (params) => `${params.value}°C`,
   },
-  commStat: {
-    name: "RS485 통신 상태",
-    formatter: (params) => (params.value ? "ON" : "OFF"),
-  },
+  
 };
 
 export const createDisplayInfoCols = (): GridColDef[] => {
@@ -52,19 +52,8 @@ export const createDisplayInfoCols = (): GridColDef[] => {
         return toDateLocaleString(new Date(params.value));
       },
     },
-    {
-      field: "workingVolt",
-      headerName: "작동 전압",
-      flex: 1,
-      align: "center",
-      headerAlign: "center",
-      minWidth: 70,
-      valueGetter: ({ row }) => {
-        const v = (Number(row["voltR"]) + Number(row["voltG"])) / 2;
-        return `${v.toFixed(1)}V`;
-      },
-    },
-    {
+   
+/*     {
       field: "redWatt",
       headerName: "적색 소비전력",
       flex: 1,
@@ -87,10 +76,11 @@ export const createDisplayInfoCols = (): GridColDef[] => {
         const w = (Number(row["voltG"]) * Number(row["currG"])) / 1000;
         return `${w.toFixed(2)}W`;
       },
-    },
+    }, */
   ];
 
   const displayInfoFields = [
+    "device ID",
     "voltR",
     "voltG",
     "currR",
@@ -98,7 +88,7 @@ export const createDisplayInfoCols = (): GridColDef[] => {
     "offCurrR",
     "offCurrG",
     "temp",
-    "commStat",
+    
   ];
 
   const additionalCols = displayInfoFields.map<GridColDef>((field) => ({
