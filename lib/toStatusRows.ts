@@ -23,9 +23,14 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
           newValue = Number(value) / 10;
           break;
 
-        case 'tempStat':
-          newValue = (Number(value) - 400) / 10;
+          case 'tempStat':
+          if (Number(value) === 0) {
+            newValue = 0;
+          } else {
+            newValue = (Number(value) - 400) / 10;
+          }
           break;
+
 
         case 'powerLimit':
         case 'dirStat':
@@ -33,11 +38,37 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
         case 'commStat':
         case 'pubNo':
         case 'firmwareResetCount':
-        case 'dispErrId':
         case 'dutyR':
         case 'dutyG':
         case 'outStat':
           newValue = Number(value);
+          break;
+          
+        case 'dispErrId':
+          const errorCode = Number(value);
+          if (isNaN(errorCode)) {
+            newValue = value;
+          } else {
+            let errorDesc = '';
+            switch (errorCode) {
+              case 203:
+                errorDesc = 'LED_BOTH';
+                break;
+              case 204:
+                errorDesc = 'LED_RON';
+                break;
+              case 205:
+                errorDesc = 'LED_ROF';
+                break;
+              case 206:
+                errorDesc = 'LED_GON';
+                break;
+              case 207:
+                errorDesc = 'LED_GOF';
+                break;
+            }
+            newValue = errorDesc ? `${value} (${errorDesc})` : value;
+          }
           break;
 
         case 'ampR':
@@ -56,11 +87,13 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
             if (!(idx % 2)) {
               const id = value;
               const state = AbnormalStatDescription[Number(array[idx + 1])];
-              result += `${id} = ${state}\n`;
+              result += `${id} `;
             }
             return result;
           }, '');
           break;
+          
+          
 
         case 'version':
           newValue = `${Number(value) / 100}`;
@@ -78,7 +111,7 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
 
       // validate numeric conversions
       if (
-        ['voltR', 'voltG', 'tempStat', 'powerLimit', 'dirStat', 'modeStat', 'commStat', 'pubNo', 'firmwareResetCount', 'dispErrId', 'dutyR', 'dutyG', 'outStat'].includes(key) ||
+        ['voltR', 'voltG', 'tempStat', 'powerLimit', 'dirStat', 'modeStat', 'commStat', 'pubNo', 'firmwareResetCount', 'dutyR', 'dutyG', 'outStat'].includes(key) ||
         (['ampR', 'ampG', 'ampOff'].includes(key) && !value.includes(','))
       ) {
         if (isNaN(Number(newValue))) {
