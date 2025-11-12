@@ -28,7 +28,7 @@ const formatAmpWithInstalled = (fieldKey: string) => (params: GridValueFormatter
   const current = typeof params.value === 'string' ? params.value.split(',')[0] : params.value;
 
   if (installed !== undefined && current !== undefined) {
-    return ` ${current}mA /${installed}mA`;
+    return ` ${current}mA `;
   }
 
   return '-';
