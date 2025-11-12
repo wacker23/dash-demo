@@ -54,6 +54,63 @@ const GridItem = styled(Paper)<GridItemProps>(({ theme, status }) => ({
   lineHeight: '40px',
 }))
 
+// Status Legend Component - responsive: wraps on small screens and uses responsive sizes
+const StatusLegend = () => {
+  const items = [
+    { color: STATUS_COLOR.normal, label: 'All right' },
+    { color: STATUS_COLOR.warn, label: 'Timeout' },
+    { color: STATUS_COLOR.emergency, label: 'No connection' },
+  ];
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: { xs: 0.5, sm: 1 },
+        flexWrap: 'wrap',
+        justifyContent: { xs: 'flex-start', sm: 'center' },
+      }}
+    >
+      {items.map((it, idx) => (
+        <Box
+          key={idx}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            minWidth: 0,
+          }}
+        >
+          <Box
+            sx={{
+              width: { xs: '8px', sm: '10px' },
+              height: { xs: '8px', sm: '10px' },
+              backgroundColor: it.color,
+              borderRadius: '2px',
+              border: '1px solid #ccc',
+              flexShrink: 0,
+            }}
+          />
+          <Typography
+            variant="body2"
+            sx={{
+              fontSize: { xs: '11px', sm: '12px' },
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: { xs: 90, sm: 'auto' },
+            }}
+          >
+            {it.label}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 const Home: NextPage = () => {
   const app = useApp();
   const user = useUser();
@@ -215,19 +272,24 @@ const Home: NextPage = () => {
       <Grid item xs={12}>
         {(session.isLoggedIn && viewMode === 'list') && (
           <>
-            <SelectRegion
-              province={province}
-              district={district}
-              onProvinceChange={value => {
-                setProvince(value);
-                setDistrict('');
-              }}
-              onDistrictChange={value => {
-                setDistrict(value);
-                app.setValue('address', `${province} ${value}`);
-              }}/>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, gap: 2 }}>
+              <SelectRegion
+                province={province}
+                district={district}
+                onProvinceChange={value => {
+                  setProvince(value);
+                  setDistrict('');
+                }}
+                onDistrictChange={value => {
+                  setDistrict(value);
+                  app.setValue('address', `${province} ${value}`);
+                }}/>
+              {/* Status Legend in the same line as region selectors */}
+              <StatusLegend />
+            </Box>
             <Box sx={{
-              height: 'calc(100vh - 165px)'
+              height: 'calc(100vh - 165px)',
+              overflow: 'auto',
             }}>
               <Grid
                 container
@@ -255,25 +317,6 @@ const Home: NextPage = () => {
                           <Grid key={`item-${equipment_type}-${id}`} item>
                             <ActionButton
                               onClick={() => handleViewStatus(id, equipment_type)}
-                              // renderAction={() => (
-                              //   <Box
-                              //     component={'div'}
-                              //     sx={{
-                              //       display: 'flex',
-                              //       flexDirection: 'row',
-                              //       alignItems: 'center',
-                              //       position: 'absolute',
-                              //       transform: 'translate(-10%, -200%)',
-                              //       gap: '15px',
-                              //     }}>
-                              //     <Fab color={'primary'}>
-                              //       <AccessAlarmIcon />
-                              //     </Fab>
-                              //     <Fab color={'primary'}>
-                              //       <RestartAltIcon />
-                              //     </Fab>
-                              //   </Box>
-                              // )}
                             >
                               <GridItem elevation={4} status={device_state}>
                                 {`${equipment_type} ${id}`}
@@ -305,7 +348,15 @@ const Home: NextPage = () => {
               flexDirection: 'column',
               p: .5,
               height: 'calc(100vh - 92px)',
+              position: 'relative',
             }}>
+            {/* Status Legend for Map View - Top line */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                {/* Empty space to balance the layout */}
+              </Box>
+              <StatusLegend />
+            </Box>
             {!isPlaceLoading && places && (
               <div
                 ref={mapWrapRef}
