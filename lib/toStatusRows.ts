@@ -15,21 +15,21 @@ const toStatusRows = (type: EquipmentTypeKey, rows: EquipmentStatusDto[]): Statu
 
     return values.reduce<StatusRowsDto>((object, value, idx) => {
       const key = fields[idx];
-      let newValue: string | number = value;
-
+      let newValue: string | number | null = value;
       switch (key) {
         case 'voltR':
         case 'voltG':
           newValue = Number(value) / 10;
           break;
 
-          case 'tempStat':
-          if (Number(value) === 0) {
-            newValue = 0;
-          } else {
-            newValue = (Number(value) - 400) / 10;
-          }
-          break;
+        case 'tempStat':
+  if (Number(value) === 0) {
+    newValue = null; // or NaN
+  } else {
+    newValue = (Number(value) - 400) / 10;
+  }
+  break;
+
 
 
         case 'powerLimit':
