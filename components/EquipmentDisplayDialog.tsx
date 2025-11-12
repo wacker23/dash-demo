@@ -242,6 +242,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
       .map((item, index) => ({
         ...item,
         id: item.id || `${props.id}-${index}`,
+        "device ID": item.deviceid,
         receive_date: item.updated_at,
         temp: item.temperature,
         currR: item.current_red,
@@ -446,201 +447,6 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
         </Box>
 
         
-{/* Power Consumption Summary Panel - Responsive like Device Grid */}
-<Container
-  maxWidth={false}
-  sx={{
-    mt: 5,
-    p: { xs: 2, sm: 4 },
-    backgroundColor: 'background.paper',
-    borderRadius: 2,
-    boxShadow: 3,
-    border: '1px solid',
-    borderColor: 'divider',
-  }}
->
-  <Typography
-    variant="h4"
-    gutterBottom
-    sx={{
-      fontWeight: 500,
-      fontSize: { xs: '1.75rem', sm: '2rem' },
-      mb: 3,
-      color: 'white',  // Changed to white
-    }}
-  >
-    전력 소비 요약 (Power Consumption)
-  </Typography>
-
-  <Grid container spacing={4}>
-    {/* Red Channel */}
-    <Grid item xs={12} md={6}>
-      <Paper
-        elevation={2}
-        sx={{
-          p: { xs: 2, sm: 3 },
-          backgroundColor: 'rgba(255, 99, 71, 0.05)',
-          borderRadius: 2,
-        }}
-      >
-        <Typography
-          variant="h5"
-          sx={{ 
-            fontWeight: 'bold', 
-            mb: 3, 
-            fontSize: '1.5rem',
-            color: 'white',  // Changed to white
-          }}
-        >
-          적색 통로 (Red)
-        </Typography>
-
-        {/* Today */}
-        <Box sx={{ mb: 3 }}>
-          <Typography
-            variant="subtitle1"
-            sx={{ 
-              fontWeight: 600, 
-              mb: 2, 
-              color: 'white',  // Changed to white
-              fontSize: '1.1rem' 
-            }}
-          >
-            오늘 (Today)
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-              평균: {powerValues.today.wattR.avg.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.light' }}>
-              최소: {powerValues.today.wattR.min.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.dark' }}>
-              최대: {powerValues.today.wattR.max.toFixed(2)} W
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Monthly */}
-        <Box>
-          <Typography
-            variant="subtitle1"
-            sx={{ 
-              fontWeight: 600, 
-              mb: 2, 
-              color: 'white',  // Changed to white
-              fontSize: '1.1rem' 
-            }}
-          >
-            최근 30일 (Last 30 Days)
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-              평균: {powerValues.monthly.wattR.avg.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.light' }}>
-              최소: {powerValues.monthly.wattR.min.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'error.dark' }}>
-              최대: {powerValues.monthly.wattR.max.toFixed(2)} W
-            </Typography>
-          </Box>
-        </Box>
-      </Paper>
-    </Grid>
-
-    {/* Green Channel */}
-    <Grid item xs={12} md={6}>
-      <Paper
-        elevation={2}
-        sx={{
-          p: { xs: 2, sm: 3 },
-          backgroundColor: 'rgba(50, 205, 50, 0.05)',
-          borderRadius: 2,
-        }}
-      >
-        <Typography
-          variant="h5"
-          sx={{ 
-            fontWeight: 'bold', 
-            mb: 3, 
-            fontSize: '1.5rem',
-            color: 'white',  // Changed to white
-          }}
-        >
-          녹색 통로 (Green)
-        </Typography>
-
-        {/* Today */}
-        <Box sx={{ mb: 3 }}>
-          <Typography
-            variant="subtitle1"
-            sx={{ 
-              fontWeight: 600, 
-              mb: 2, 
-              color: 'white',  // Changed to white
-              fontSize: '1.1rem' 
-            }}
-          >
-            오늘 (Today)
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-              평균: {powerValues.today.wattG.avg.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.light' }}>
-              최소: {powerValues.today.wattG.min.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
-              최대: {powerValues.today.wattG.max.toFixed(2)} W
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Monthly */}
-        <Box>
-          <Typography
-            variant="subtitle1"
-            sx={{ 
-              fontWeight: 600, 
-              mb: 2, 
-              color: 'white',  // Changed to white
-              fontSize: '1.1rem' 
-            }}
-          >
-            최근 30일 (Last 30 Days)
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-              평균: {powerValues.monthly.wattG.avg.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.light' }}>
-              최소: {powerValues.monthly.wattG.min.toFixed(2)} W
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
-              최대: {powerValues.monthly.wattG.max.toFixed(2)} W
-            </Typography>
-          </Box>
-        </Box>
-      </Paper>
-    </Grid>
-  </Grid>
-
-  {selectedDeviceId !== null && (
-    <Typography
-      variant="body2"
-      sx={{
-        mt: 4,
-        fontStyle: 'italic',
-        textAlign: 'right',
-        fontSize: { xs: '0.9rem', sm: '1rem' },
-        color: 'white',  // Changed to white
-      }}
-    >
-      Filtered by device: {selectedDeviceId}
-    </Typography>
-  )}
-</Container>
 
 
       <Container
@@ -736,7 +542,7 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                                     )}
                                     {String(item.dataKey).startsWith('offCurr') && (
                                       <Typography color={item.color} fontWeight={'bold'}>
-                                        {`${item.name}: ${item.value}A`}
+                                        {`${item.name}: ${item.value}mA`}
                                       </Typography>
                                     )}
                                   </Fragment>
@@ -860,31 +666,43 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
               }
 
               return (
-                <Grid item key={index} xs={3} sm={2} md={1.5} lg={1}>
-                  <Tooltip 
-                    title={
-                      deviceStatus ? (
-                        <Paper sx={{ px: 1, py: 0.5, backgroundColor: '#202123' }}>
-                          <Typography variant="body2">
-                            Device: {deviceStatus.deviceid}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Avg Red: {deviceStatus.avgCurrentRed.toFixed(2)}mA
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            Avg Green: {deviceStatus.avgCurrentGreen.toFixed(2)}mA
-                          </Typography>
-                          <Typography variant="body2" color={hasWarning ? 'error' : 'success'}>
-                            {deviceStatus.warningMessage}
-                          </Typography>
-                        </Paper>
-                      ) : (
-                        <Typography variant="body2">No data available</Typography>
-                      )
-                    }
-                    placement="top"
-                    arrow
-                  >
+  <Grid item key={index} xs={3} sm={2} md={1.5} lg={1}>
+    <Tooltip
+      title={
+        deviceStatus ? (
+          <Paper
+            sx={{
+              px: 1,
+              py: 0.5,
+              backgroundColor: 'black',
+              color: 'white',
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'white' }}>
+              Device: {deviceStatus.deviceid}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'white' }}>
+              Avg Red: {deviceStatus.avgCurrentRed.toFixed(2)}mA
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'white' }}>
+              Avg Green: {deviceStatus.avgCurrentGreen.toFixed(2)}mA
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ color: hasWarning ? 'red' : 'lightgreen' }}
+            >
+              {deviceStatus.warningMessage}
+            </Typography>
+          </Paper>
+        ) : (
+          <Typography variant="body2" sx={{ color: 'white' }}>
+            No data available
+          </Typography>
+        )
+      }
+      placement="top"
+      arrow
+    >
                     <Box
                       onClick={() => handleDeviceClick(deviceId)}
                       sx={{
