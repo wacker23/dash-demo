@@ -93,10 +93,15 @@ const fieldConfig: { [p: string]: { name: string, formatter?: (params: GridValue
 }, */
 
 tempStat: {
-    name: '온도',
-    formatter: (params): string =>
-      `${params.value}°C`,
+  name: '온도',
+  formatter: (params): string => {
+    // if value is null, undefined, or NaN → show "-"
+    if (params.value === null || params.value === undefined || isNaN(Number(params.value))) {
+      return '-';
+    }
+    return `${params.value}°C`;
   },
+},
 
   powerLimit: {
     name: '전원(MAX)',
