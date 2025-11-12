@@ -25,6 +25,7 @@ export const EquipmentStatusFields: EquipmentStatusFieldsType = {
     'dispAbnormalStat',
     'version',
     'timestamp',
+   
   ] as const,
   DGL: [
     'voltR',
