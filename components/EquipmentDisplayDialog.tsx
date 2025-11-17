@@ -530,19 +530,10 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                                         {`${item.name}: ${item.value}V`}
                                       </Typography>
                                     )}
-                                    {String(item.dataKey) === 'currR' && (
-                                      <Typography color={item.color} fontWeight={'bold'}>
-                                        {`${item.name}: ${currR.toFixed(2)}A (${wattR}W)`}
-                                      </Typography>
-                                    )}
-                                    {String(item.dataKey) === 'currG' && (
-                                      <Typography color={item.color} fontWeight={'bold'}>
-                                        {`${item.name}: ${currG.toFixed(2)}A (${wattG}W)`}
-                                      </Typography>
-                                    )}
+                                    
                                     {String(item.dataKey).startsWith('offCurr') && (
                                       <Typography color={item.color} fontWeight={'bold'}>
-                                        {`${item.name}: ${item.value}mA`}
+                                        {`${item.name}: ${item.value}(Ad.)`}
                                       </Typography>
                                     )}
                                   </Fragment>
@@ -596,8 +587,6 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                       { key: 'temp', name: '온도', color: '#ffd700', type: 'monotone', yAxisId: 'tempAxis' },
                       { key: 'voltR', name: '전압 R', color: '#ff6347', type: 'monotone', yAxisId: 'voltAxis' },
                       { key: 'voltG', name: '전압 G', color: '#32cd32', type: 'monotone', yAxisId: 'voltAxis' },
-                      { key: 'currR', name: '전류 R', color: '#ff4500', type: 'monotone', yAxisId: 'currAxis' },
-                      { key: 'currG', name: '전류 G', color: '#228b22', type: 'monotone', yAxisId: 'currAxis' },
                       { key: 'offCurrR', name: 'Off 전류 R', color: '#e9967a', type: 'monotone', yAxisId: 'currAxis' },
                       { key: 'offCurrG', name: 'Off 전류 G', color: '#20b2aa', type: 'monotone', yAxisId: 'currAxis' },
                     ]} />
