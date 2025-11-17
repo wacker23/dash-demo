@@ -1,7 +1,7 @@
 import { Box, Grid } from '@mui/material';
 import Select from './Select';
 import regions from '../lib/regions';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useMap } from 'react-kakao-maps-sdk';
 import { addressSearch } from '../lib/utils';
 
@@ -14,57 +14,83 @@ type Props = {
   onDistrictChange: (value: string) => void;
 };
 
-const SelectRegion = ({province, district, ...props}: Props) => {
-
-  const handleProvinceChange = (value: any) => {
-    props.onProvinceChange(value);
-  }
-
-  const handleDistrictChange = (value: any) => {
-    props.onDistrictChange(value);
-  }
+const SelectRegion = ({ province, district, ...props }: Props) => {
+  // Safely get districts based on province
+  const districts =
+    province && (regions as any)[province as ProvinceType]
+      ? (regions as any)[province as ProvinceType]
+      : [];
 
   return (
     <Grid container spacing={1}>
-      <Grid item sx={{width: 150}}>
+      {/* Province */}
+      <Grid item sx={{ width: 150 }}>
         <Select
-          options={Object.keys(regions).map(province => ({
-            label: province, value: province,
+          options={Object.keys(regions).map(p => ({
+            label: p,
+            value: p,
           }))}
-          label={'시/도'}
+          label="시/도"
           selectedValue={province}
-          onChange={handleProvinceChange} />
+          onChange={props.onProvinceChange}
+        />
       </Grid>
-      <Grid item sx={{width: 150}}>
-        {province && regions[province as ProvinceType].length > 0 && (
+
+      {/* District */}
+      <Grid item sx={{ width: 150 }}>
+        {districts.length > 0 && (
           <Select
-            options={regions[province as ProvinceType].map(district => ({
-              label: district, value: district,
+            options={districts.map((d: string) => ({
+              label: d,
+              value: d,
             }))}
-            label={'시/군/구'}
+            label="시/군/구"
             selectedValue={district}
-            onChange={handleDistrictChange} />
+            onChange={props.onDistrictChange}
+          />
         )}
       </Grid>
     </Grid>
   );
 };
 
+//
+// SelectRegionOnMap
+//
 type SelectRegionOnMapProps = {
   province?: string;
   district?: string;
-}
+};
 
-export const SelectRegionOnMap = (props: SelectRegionOnMapProps) => {
+export const SelectRegionOnMap = ({ province: pProp, district: dProp }: SelectRegionOnMapProps) => {
   const map = useMap();
-  const [province, setProvince] = useState(props.province ?? '');
-  const [district, setDistrict] = useState(props.district ?? '');
 
-  const moveToCenter = useCallback(async (addr: string) => {
-    const newCenter = await addressSearch(addr);
-    map.setCenter(newCenter);
-    map.setLevel(3);
-  }, [map]);
+  const [province, setProvince] = useState(pProp ?? '');
+  const [district, setDistrict] = useState(dProp ?? '');
+
+  const moveToCenter = useCallback(
+    async (addr: string) => {
+      const newCenter = await addressSearch(addr);
+      map.setCenter(newCenter);
+      map.setLevel(3);
+    },
+    [map]
+  );
+
+  const handleProvinceChange = (value: string) => {
+    if (value !== province) {
+      setProvince(value);
+      setDistrict('');
+      moveToCenter(value);
+    }
+  };
+
+  const handleDistrictChange = (value: string) => {
+    if (value !== district) {
+      setDistrict(value);
+      moveToCenter(`${province} ${value}`);
+    }
+  };
 
   return (
     <Box
@@ -73,23 +99,14 @@ export const SelectRegionOnMap = (props: SelectRegionOnMapProps) => {
         top: 5,
         left: 5,
         zIndex: 10,
-      }}>
+      }}
+    >
       <SelectRegion
-        province={props.province ?? province}
-        district={props.district ?? district}
-        onProvinceChange={value => {
-          if (value !== province) {
-            setProvince(value);
-            setDistrict('');
-            moveToCenter(value).then(() => false);
-          }
-        }}
-        onDistrictChange={value => {
-          if (value !== district) {
-            setDistrict(value);
-            moveToCenter(`${province} ${value}`).then(() => false);
-          }
-        }}/>
+        province={pProp ?? province}
+        district={dProp ?? district}
+        onProvinceChange={handleProvinceChange}
+        onDistrictChange={handleDistrictChange}
+      />
     </Box>
   );
 };
