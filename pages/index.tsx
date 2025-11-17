@@ -288,15 +288,15 @@ useEffect(() => {
                     </Paper>
                   </Grid>
                 ))}
-                {searchData.length === 0 && (
-                  <Grid item xs={12} container justifyContent={'center'}>
-                    <Typography variant={'h6'}>
-                      {province.trim() === '' && '시/도를 선택해주세요.'}
-                      {province.trim() !== '' && district.trim() === '' && '시/군/구를 선택해주세요.'}
-                      {province.trim() !== '' && district.trim() !== '' && '이 지역에 설치된 장비가 없습니다.'}
-                    </Typography>
-                  </Grid>
-                )}
+                            {searchData.length === 0 && (
+                <Grid item xs={12} container justifyContent={'center'}>
+                  <Typography variant={'h6'}>
+                    {(province ?? '').trim() === '' && '시/도를 선택해주세요.'}
+                    {(province ?? '').trim() !== '' && (district ?? '').trim() === '' && '시/군/구를 선택해주세요.'}
+                    {(province ?? '').trim() !== '' && (district ?? '').trim() !== '' && '이 지역에 설치된 장비가 없습니다.'}
+                  </Typography>
+                </Grid>
+              )}
               </Grid>
             </Box>
           </>
