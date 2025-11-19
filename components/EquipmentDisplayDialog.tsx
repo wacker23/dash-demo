@@ -234,25 +234,25 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
     return uniqueDeviceIds.size;
   }, [displayInfo]);
 
-  const gridData = useMemo(() => {
-    if (!displayInfo || !Array.isArray(displayInfo)) return [];
-    
-    return [...displayInfo]
-      .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
-      .map((item, index) => ({
-        ...item,
-        id: item.id || `${props.id}-${index}`,
-        "device ID": item.deviceid,
-        receive_date: item.updated_at,
-        temp: item.temperature,
-        currR: item.current_red,
-        currG: item.current_green,
-        offCurrR: item.off_current_red,
-        offCurrG: item.off_current_green,
-        voltR: item.voltage_red,
-        voltG: item.voltage_green,
-      }));
-  }, [displayInfo, props.id]);
+const gridData = useMemo(() => {
+  if (!displayInfo || !Array.isArray(displayInfo)) return [];
+  
+  return [...displayInfo]
+    .sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
+    .map((item, index) => ({
+      ...item,
+      id: item.id || `${props.id}-${index}`,
+      "device ID": item.deviceid,
+      receive_date: item.updated_at,
+      temp: item.temperature === -40 ? 0 : item.temperature, // Convert -40 to 0
+      currR: item.current_red,
+      currG: item.current_green,
+      offCurrR: item.off_current_red,
+      offCurrG: item.off_current_green,
+      voltR: item.voltage_red,
+      voltG: item.voltage_green,
+    }));
+}, [displayInfo, props.id]);
 
   const filteredGridData = useMemo(() => {
     let result = [...gridData];
@@ -521,9 +521,9 @@ const EquipmentDisplayDialog = ({ visible, ...props }: Props) => {
                                 {payload.map(item => (
                                   <Fragment key={item.dataKey}>
                                     {String(item.dataKey) === 'temp' && (
-                                      <Typography color={item.color} fontWeight={'bold'}>
-                                        {`${item.name}: ${item.value}°C`}
-                                      </Typography>
+                                    <Typography color={item.color} fontWeight={'bold'}>
+                                      {`${item.name}: ${Number(item.value) === -40 ? 0 : item.value}°C`}
+                                    </Typography>
                                     )}
                                     {String(item.dataKey).startsWith('volt') && (
                                       <Typography color={item.color} fontWeight={'bold'}>
