@@ -51,7 +51,7 @@ function TabPanel(props: TabPanelProps) {
             p: 2,
             display: 'flex',
             flexDirection: 'column',
-            height: 'calc(100vh - 155px)',
+            height: 'calc(100vh - 200px)',
           }}>
           {props.children}
         </Paper>
@@ -84,6 +84,32 @@ const EquipmentDialog = ({visible, ...props}: Props) => {
   const statusCols = useMemo(() => (
     device?.equipment_type ? createStatusCols(device.equipment_type) : []
   ), [device]);
+
+  // Calculate average Watt values
+  const avgWattValues = useMemo(() => {
+    if (dailyLog.length === 0) return { avgWattR: 0, avgWattG: 0 };
+
+    const validLogs = dailyLog.filter(log => 
+      log.voltR && log.voltG && log.ampR && log.ampG
+    );
+
+    if (validLogs.length === 0) return { avgWattR: 0, avgWattG: 0 };
+
+    const totalWattR = validLogs.reduce((sum, log) => {
+      const ampR = Math.floor(Number(log.ampR) / 10) / 100;
+      return sum + (Number(log.voltR) * ampR);
+    }, 0);
+
+    const totalWattG = validLogs.reduce((sum, log) => {
+      const ampG = Math.floor(Number(log.ampG) / 10) / 100;
+      return sum + (Number(log.voltG) * ampG);
+    }, 0);
+
+    return {
+      avgWattR: Math.round((totalWattR / validLogs.length) * 100) / 100,
+      avgWattG: Math.round((totalWattG / validLogs.length) * 100) / 100
+    };
+  }, [dailyLog]);
 
   console.log(statusRows)
 
@@ -279,30 +305,73 @@ const EquipmentDialog = ({visible, ...props}: Props) => {
           </Box>
         </Toolbar>
       </AppBar>
-      <DialogContent>
+      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+        {/* Average Watt Display Container */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            mt: 7,
+            mb: 2,
+            px: 2
+          }}
+        >
+          <Paper
+            sx={{
+              p: 1.5,
+              display: 'flex',
+              gap: 3,
+              backgroundColor: 'primary.main',
+              color: 'white',
+              minWidth: 300,
+              justifyContent: 'center'
+            }}
+          >
+            <Box textAlign="center">
+              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+                평균 전력 R
+              </Typography>
+              <Typography variant="h6" fontWeight="bold">
+                {avgWattValues.avgWattR} W
+              </Typography>
+            </Box>
+            <Box textAlign="center">
+              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+                평균 전력 G
+              </Typography>
+              <Typography variant="h6" fontWeight="bold">
+                {avgWattValues.avgWattG} W
+              </Typography>
+            </Box>
+          </Paper>
+        </Box>
+
         <Box
           sx={{
             display: 'block',
             '@media (min-width: 960px) and (min-height: 640px)': {
               display: 'none',
             },
-            mt: 5
+            height: 'calc(100vh - 160px)',
+            overflow: 'hidden'
           }}>
-          <Typography component="h2" variant="h6" color="primary" gutterBottom>
+          <Typography component="h2" variant="h6" color="primary" gutterBottom sx={{ px: 2 }}>
             상세 로그
           </Typography>
-          <DataGrid
-            columns={statusCols}
-            rows={statusRows}
-            rowCount={device?.statusCount ?? 0}
-            getRowId={row => row['id']}
-            sortModel={[{field: 'receive_date', sort: 'desc'}]}
-            pageSizeOptions={[100]}
-            paginationMode={'server'}
-            onPaginationModelChange={handlePaginationChange}
-            localeText={{
-              noRowsLabel: '수신된 상태 정보가 없습니다.',
-            }} />
+          <Box sx={{ height: 'calc(100% - 40px)', px: 2 }}>
+            <DataGrid
+              columns={statusCols}
+              rows={statusRows}
+              rowCount={device?.statusCount ?? 0}
+              getRowId={row => row['id']}
+              sortModel={[{field: 'receive_date', sort: 'desc'}]}
+              pageSizeOptions={[100]}
+              paginationMode={'server'}
+              onPaginationModelChange={handlePaginationChange}
+              localeText={{
+                noRowsLabel: '수신된 상태 정보가 없습니다.',
+              }} />
+          </Box>
         </Box>
         <Container
           maxWidth={false}
@@ -310,10 +379,12 @@ const EquipmentDialog = ({visible, ...props}: Props) => {
             display: 'none',
             '@media (min-width: 960px) and (min-height: 640px)': {
               display: 'block',
-            }
+            },
+            height: 'calc(100vh - 140px)',
+            overflow: 'hidden'
           }}>
-          <Grid container sx={{mt: 5}} spacing={3}>
-            <Grid item xs={12}>
+          <Grid container spacing={1} sx={{ height: '100%', mt: 1 }}>
+            <Grid item xs={12} sx={{ height: '100%' }}>
               <Tabs
                 variant={'fullWidth'}
                 value={tabState}
@@ -441,18 +512,20 @@ const EquipmentDialog = ({visible, ...props}: Props) => {
                 <Typography component="h2" variant="h6" color="primary" gutterBottom>
                   상세 로그
                 </Typography>
-                <DataGrid
-                  columns={statusCols}
-                  rows={statusRows}
-                  rowCount={device?.statusCount ?? 0}
-                  getRowId={row => row['id']}
-                  sortModel={[{field: 'receive_date', sort: 'desc'}]}
-                  pageSizeOptions={[100]}
-                  paginationMode={'server'}
-                  onPaginationModelChange={handlePaginationChange}
-                  localeText={{
-                    noRowsLabel: '수신된 상태 정보가 없습니다.',
-                  }} />
+                <Box sx={{ height: 'calc(100% - 40px)' }}>
+                  <DataGrid
+                    columns={statusCols}
+                    rows={statusRows}
+                    rowCount={device?.statusCount ?? 0}
+                    getRowId={row => row['id']}
+                    sortModel={[{field: 'receive_date', sort: 'desc'}]}
+                    pageSizeOptions={[100]}
+                    paginationMode={'server'}
+                    onPaginationModelChange={handlePaginationChange}
+                    localeText={{
+                      noRowsLabel: '수신된 상태 정보가 없습니다.',
+                    }} />
+                </Box>
               </TabPanel>
             </Grid>
           </Grid>
