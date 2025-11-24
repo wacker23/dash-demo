@@ -85,31 +85,67 @@ const EquipmentDialog = ({visible, ...props}: Props) => {
     device?.equipment_type ? createStatusCols(device.equipment_type) : []
   ), [device]);
 
-  // Calculate average Watt values
-  const avgWattValues = useMemo(() => {
-    if (dailyLog.length === 0) return { avgWattR: 0, avgWattG: 0 };
+  // Calculate all Watt values
+  const wattValues = useMemo(() => {
+    if (dailyLog.length === 0) return { 
+      avgWattR: 0, 
+      avgWattG: 0,
+      maxWattR: 0,
+      maxWattG: 0,
+      minWattR: 0,
+      minWattG: 0,
+      avgWattRPerUnit: 0,
+      avgWattGPerUnit: 0
+    };
 
     const validLogs = dailyLog.filter(log => 
       log.voltR && log.voltG && log.ampR && log.ampG
     );
 
-    if (validLogs.length === 0) return { avgWattR: 0, avgWattG: 0 };
+    if (validLogs.length === 0) return { 
+      avgWattR: 0, 
+      avgWattG: 0,
+      maxWattR: 0,
+      maxWattG: 0,
+      minWattR: 0,
+      minWattG: 0,
+      avgWattRPerUnit: 0,
+      avgWattGPerUnit: 0
+    };
 
-    const totalWattR = validLogs.reduce((sum, log) => {
+    const wattRValues = validLogs.map(log => {
       const ampR = Math.floor(Number(log.ampR) / 10) / 100;
-      return sum + (Number(log.voltR) * ampR);
-    }, 0);
+      return Number(log.voltR) * ampR;
+    });
 
-    const totalWattG = validLogs.reduce((sum, log) => {
+    const wattGValues = validLogs.map(log => {
       const ampG = Math.floor(Number(log.ampG) / 10) / 100;
-      return sum + (Number(log.voltG) * ampG);
-    }, 0);
+      return Number(log.voltG) * ampG;
+    });
+
+    const totalWattR = wattRValues.reduce((sum, watt) => sum + watt, 0);
+    const totalWattG = wattGValues.reduce((sum, watt) => sum + watt, 0);
+
+    const maxWattR = Math.max(...wattRValues);
+    const maxWattG = Math.max(...wattGValues);
+    const minWattR = Math.min(...wattRValues);
+    const minWattG = Math.min(...wattGValues);
+
+    const units = device?.units || 1;
+    const avgWattRPerUnit = totalWattR / validLogs.length / units;
+    const avgWattGPerUnit = totalWattG / validLogs.length / units;
 
     return {
       avgWattR: Math.round((totalWattR / validLogs.length) * 100) / 100,
-      avgWattG: Math.round((totalWattG / validLogs.length) * 100) / 100
+      avgWattG: Math.round((totalWattG / validLogs.length) * 100) / 100,
+      maxWattR: Math.round(maxWattR * 100) / 100,
+      maxWattG: Math.round(maxWattG * 100) / 100,
+      minWattR: Math.round(minWattR * 100) / 100,
+      minWattG: Math.round(minWattG * 100) / 100,
+      avgWattRPerUnit: Math.round(avgWattRPerUnit * 100) / 100,
+      avgWattGPerUnit: Math.round(avgWattGPerUnit * 100) / 100
     };
-  }, [dailyLog]);
+  }, [dailyLog, device]);
 
   console.log(statusRows)
 
@@ -306,44 +342,215 @@ const EquipmentDialog = ({visible, ...props}: Props) => {
         </Toolbar>
       </AppBar>
       <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
-        {/* Average Watt Display Container */}
+        {/* Power Statistics Display Container */}
         <Box
           sx={{
             display: 'flex',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             mt: 7,
             mb: 2,
-            px: 2
+            px: 1,
+            overflowX: 'auto',
+            '&::-webkit-scrollbar': {
+              height: 4,
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#f1f1f1',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#888',
+              borderRadius: 2,
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              background: '#555',
+            }
           }}
         >
-          <Paper
+          <Box
             sx={{
-              p: 1.5,
               display: 'flex',
-              gap: 3,
-              backgroundColor: 'primary.main',
-              color: 'white',
-              minWidth: 300,
-              justifyContent: 'center'
+              gap: 1,
+              flexWrap: 'nowrap',
+              minWidth: 'max-content',
+              px: 1,
+              justifyContent: 'flex-start'
             }}
           >
-            <Box textAlign="center">
-              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+            {/* Average Power R */} 
+            <Paper
+              sx={{
+                p: 0.75,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#728370',
+                color: 'white',
+                minWidth: 100,
+                maxWidth: 100,
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Typography variant="caption" sx={{ opacity: 0.9, fontSize: { xs: '0.65rem', sm: '0.75rem' }, lineHeight: 1.1 }}>
                 평균 전력 R
               </Typography>
-              <Typography variant="h6" fontWeight="bold">
-                {avgWattValues.avgWattR} W
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.9rem' }, lineHeight: 1.2 }}>
+                {wattValues.avgWattR} W
               </Typography>
-            </Box>
-            <Box textAlign="center">
-              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+            </Paper>
+
+            {/* Average Power G */}
+            <Paper
+              sx={{
+                p: 0.75,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#728370',
+                color: 'white',
+                minWidth: 100,
+                maxWidth: 100,
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Typography variant="caption" sx={{ opacity: 0.9, fontSize: { xs: '0.65rem', sm: '0.75rem' }, lineHeight: 1.1 }}>
                 평균 전력 G
               </Typography>
-              <Typography variant="h6" fontWeight="bold">
-                {avgWattValues.avgWattG} W
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.9rem' }, lineHeight: 1.2 }}>
+                {wattValues.avgWattG} W
               </Typography>
-            </Box>
-          </Paper>
+            </Paper>
+
+            {/* Per-unit average Papers (separate from the main Avg cards) */}
+            {device?.units && device.units > 1 && (
+              <>
+                <Paper sx={{
+                  p: 0.6,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  backgroundColor: '#5b6b6b',
+                  color: '#ffce1b',
+                  minWidth: 100,
+                  maxWidth: 120,
+                  textAlign: 'center',
+                  flexShrink: 0
+                }}>
+                  <Typography variant="caption" sx={{ opacity: 0.9, fontSize: { xs: '0.6rem', sm: '0.75rem' }, lineHeight: 1.1 }}>
+                    평균 전력 R (개당)
+                  </Typography>
+                  <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.7rem', sm: '0.85rem' }, mt: 0.25 }}>
+                    {wattValues.avgWattRPerUnit} W/개
+                  </Typography>
+                </Paper>
+
+                <Paper sx={{
+                  p: 0.6,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  backgroundColor: '#5b6b6b',
+                  color: '#ffce1b',
+                  minWidth: 100,
+                  maxWidth: 120,
+                  textAlign: 'center',
+                  flexShrink: 0
+                }}>
+                  <Typography variant="caption" sx={{ opacity: 0.9, fontSize: { xs: '0.6rem', sm: '0.75rem' }, lineHeight: 1.1 }}>
+                    평균 전력 G (개당)
+                  </Typography>
+                  <Typography variant="subtitle2" fontWeight="bold" sx={{ fontSize: { xs: '0.7rem', sm: '0.85rem' }, mt: 0.25 }}>
+                    {wattValues.avgWattGPerUnit} W/개
+                  </Typography>
+                </Paper>
+              </>
+            )}
+
+            {/* Max Power R */}
+            <Paper
+              sx={{
+                p: 0.75,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#d37073',
+                color: 'white',
+                minWidth: 100,
+                maxWidth: 100,
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Typography variant="caption" sx={{ opacity: 1, fontSize: { xs: '0.65rem', sm: '0.85rem' }, lineHeight: 1.1 }}>
+                MAX 전력 R
+              </Typography>
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.9rem' }, lineHeight: 1.2 }}>
+                {wattValues.maxWattR} W
+              </Typography>
+            </Paper>
+
+            {/* Max Power G */}
+            <Paper
+              sx={{
+                p: 0.75,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#d37073',
+                color: 'white',
+                minWidth: 100,
+                maxWidth: 100,
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Typography variant="caption" sx={{ opacity: 1, fontSize: { xs: '0.65rem', sm: '0.85rem' }, lineHeight: 1.1 }}>
+                MAX 전력 G
+              </Typography>
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.9rem' }, lineHeight: 1.2 }}>
+                {wattValues.maxWattG} W
+              </Typography>
+            </Paper>
+
+            {/* Min Power R */}
+            <Paper
+              sx={{
+                p: 0.75,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#90b493',
+                color: '#ffce1b',
+                minWidth: 100,
+                maxWidth: 100,
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Typography variant="caption" sx={{ opacity: 1, fontSize: { xs: '0.65rem', sm: '0.85rem' }, lineHeight: 1.1 }}>
+                MIN 전력 R
+              </Typography>
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.9rem' }, lineHeight: 1.2 }}>
+                {wattValues.minWattR} W
+              </Typography>
+            </Paper>
+
+            {/* Min Power G */}
+            <Paper
+              sx={{
+                p: 0.75,
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#90b493',
+                color: '#ffce1b',
+                minWidth: 100,
+                maxWidth: 100,
+                textAlign: 'center',
+                flexShrink: 0
+              }}
+            >
+              <Typography variant="caption" sx={{ opacity: 1, fontSize: { xs: '0.65rem', sm: '0.85rem' }, lineHeight: 1.1 }}>
+                MIN 전력 G
+              </Typography>
+              <Typography variant="subtitle1" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.9rem' }, lineHeight: 1.2 }}>
+                {wattValues.minWattG} W
+              </Typography>
+            </Paper>
+          </Box>
         </Box>
 
         <Box
