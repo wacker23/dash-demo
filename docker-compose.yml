@@ -9,7 +9,7 @@ services:
     - traefik.http.routers.dashboard-appdemo.tls.certresolver=resolver
     - traefik.http.services.dashboard-appdemo.loadbalancer.server.port=3000
     - traefik.http.services.dashboard-appdemo.loadbalancer.server.scheme=http
-    image: registry.smartsignal.co.kr/dashboard-demo:latest2
+    image: registry.smartsignal.co.kr/dashboard-demo:latest1
     environment:
     - NODE_ENV=production
     - HOST=0.0.0.0
